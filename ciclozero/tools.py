@@ -386,7 +386,7 @@ def calcular_reposicao() -> dict:
                 dias_txt = "dia" if prazo == 1 else "dias"
                 if pela_venda >= p["estoque_minimo"]:
                     base = (f"média de vendas {_num(media)} {u}/dia × ({prazo} {dias_txt} de entrega + {COBERTURA_DIAS} dias "
-                            f"de cobertura) = {_num(pela_venda)} {u}")
+                            f"de cobertura = {prazo + COBERTURA_DIAS} dias) = {_num(pela_venda)} {u}")
                 else:
                     base = f"estoque mínimo de {_num(alvo)} {u} (maior que a venda prevista de {_num(pela_venda)} {u})"
                 conta = f"{base} − saldo atual {_num(saldo)} {u}"
