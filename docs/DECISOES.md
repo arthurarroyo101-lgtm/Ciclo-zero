@@ -5,7 +5,7 @@
 ## Equipe
 | Pessoa | GitHub | Responsabilidade |
 |---|---|---|
-| Matheus | — | Agente de IA e ferramentas (núcleo da solução) |
+| Matheus | matheussari | Agente de IA e ferramentas (núcleo da solução) |
 | João Paulo | joaopaulo167 | Interface (Streamlit) e dados de exemplo |
 | Arthur | arthurarroyo101-lgtm | BMC, pitch, documentação do fluxo e validação com comerciante real · dono do repositório |
 
@@ -54,10 +54,24 @@ Nota 1 a 5 por critério; item não abordado = 1. Desempate: maior nota em Solu�
 Perguntas que a banca tende a fazer (seção 10 do edital): de onde vêm os fatos do agente e como evita inventar; como decide chamar uma ferramenta e o que faz quando nenhuma serve; o que acontece com entrada inesperada; o que lembra entre sessões e LGPD; como investigaríamos uma resposta ruim.
 
 ## Pendências
-- [ ] Matheus ter acesso de push ao repositório (Arthur adiciona como colaborador)
+- [x] Matheus com acesso de push ao repositório
+- [ ] João Paulo aceitar convite de colaborador (se ainda não aceitou)
 - [ ] Cada um criar sua chave do Gemini em https://aistudio.google.com/apikey
 - [ ] Entrevista rápida com comerciante conhecido (Arthur) — registrar respostas em `docs/validacao.md`
 
+## Arquitetura (v0.1)
+```
+app.py                  → interface Streamlit (João Paulo evolui)
+ciclozero/db.py         → SQLite: produtos, lotes (validade), movimentações, pedidos, log_agente
+ciclozero/tools.py      → 8 ferramentas do agente (os números saem daqui, nunca do LLM)
+ciclozero/agent.py      → loop Gemini + function calling, guardrails, rastreio
+ciclozero/seed.py       → padaria/mercadinho fictício com 30 dias de histórico
+docs/FLUXO_AGENTE.md    → entregável: inputs, lógica, outputs (Arthur revisa)
+```
+Decisões de projeto: cálculos em Python (não no LLM) para evitar número inventado; FEFO na baixa de estoque; pedido de compra sempre como rascunho com aprovação humana; pedido > 2× o sugerido é bloqueado; desconto máximo 50%; máximo 8 passos por pergunta; modelo configurável por `GEMINI_MODEL` (padrão `gemini-2.5-flash`).
+
 ## Log
+- **2026-10-23 21:15** — Base do agente criada (v0.1): banco, 8 ferramentas, loop do agente com Gemini, modo autônomo "rotina diária", interface Streamlit com abas Agente/Estoque/Pedidos/Rastreio, dados de exemplo e documentação do fluxo. Ferramentas testadas localmente; falta testar com chave real do Gemini.
+- **2026-10-23 21:10** — Primeiro push feito. Commits usam o e-mail noreply do GitHub (o GitHub bloqueia push que expõe e-mail privado).
 - **2026-10-23 21:00** — Confirmado: hackathon presencial Centro-Oeste (24/10). Tema da inscrição: Ciclo Zero (desperdício de alimentos em pequenos comércios). Repositório criado pelo Arthur (`arthurarroyo101-lgtm/Ciclo-zero`). Sem créditos AWS → Gemini gratuito. Divisão de tarefas aceita. A equipe conhece comerciantes para validação.
 - **2026-10-23 20:50** — Análise do edital feita; definidos critérios, entregáveis e stack sugerida (Python + Streamlit + SQLite + LLM com function calling).

@@ -16,9 +16,11 @@ pip install -r requirements.txt
 cp .env.example .env   # e coloque sua GEMINI_API_KEY
 streamlit run app.py
 ```
+Na primeira execução o app cria um banco com dados de exemplo (padaria fictícia). Para testar só no terminal: `python -m ciclozero.agent`.
 
 ## Documentação
 - [Diário de decisões](docs/DECISOES.md)
+- [Fluxo do agente (inputs, lógica, outputs)](docs/FLUXO_AGENTE.md)
 
 ## Licença
 MIT
