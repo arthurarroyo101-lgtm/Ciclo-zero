@@ -58,6 +58,14 @@ CREATE TABLE IF NOT EXISTS apelidos (
     vezes INTEGER DEFAULT 1,
     atualizado_em TEXT DEFAULT (datetime('now','localtime'))
 );
+CREATE TABLE IF NOT EXISTS despesas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    data TEXT NOT NULL,
+    hora TEXT,
+    categoria TEXT NOT NULL,     -- energia, gás, embalagens, frete, manutenção...
+    descricao TEXT,
+    valor REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS log_agente (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sessao TEXT,

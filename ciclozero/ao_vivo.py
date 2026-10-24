@@ -1,8 +1,9 @@
 """Loja "ao vivo": simulador de vendas do caixa + painel que se atualiza sozinho.
 
 Num comércio real, as vendas chegariam do PDV/caixa o dia inteiro. Para a demo, este simulador
-gera, em ritmo acelerado, ~80% vendas, ~12% chegadas de mercadoria (repõe o que está acabando) e ~8% perdas
-(algo estraga). As vendas são realistas (proporcionais à média de cada produto, baixando do lote que vence primeiro,
+gera, em ritmo acelerado: vendas (~72%), compras recebidas (~7%, 30% delas exageradas), fornadas da padaria (~7%,
+validade curta), perdas (~5%), despesas pagas (~5%: energia, gás, embalagens...) e pedidos automáticos (~4%).
+Caixa e lucro sobem E descem, como num dia real. As vendas são realistas (proporcionais à média de cada produto, baixando do lote que vence primeiro,
 nunca deixando estoque negativo) usando a MESMA ferramenta do agente (tools.registrar_saida).
 Tudo marcado como simulação (motivo "simulação ao vivo") e desligado por padrão.
 
@@ -11,6 +12,7 @@ Uso no terminal (sem interface):  python -m ciclozero.ao_vivo
 """
 from __future__ import annotations
 
+import json
 import random
 import threading
 import time
@@ -31,7 +33,8 @@ class Simulador:
     def __init__(self):
         self._thread: threading.Thread | None = None
         self._parar = threading.Event()
-        self.eventos: deque = deque(maxlen=12)   # últimas vendas, para o letreiro
+        self.eventos: deque = deque(maxlen=12)
+        self.alertas: deque = deque(maxlen=6)   # compras/produções em excesso flagradas   # últimas vendas, para o letreiro
         self.vendas_sessao = 0
         self.ligado_em = 0.0
 
@@ -63,15 +66,44 @@ class Simulador:
     def passo(self) -> list[dict]:
         """Um momento da loja: quase sempre um cliente no caixa; às vezes chega mercadoria ou algo estraga."""
         sorteio = random.random()
-        if sorteio < 0.05 and time.time() - self.ligado_em > PEDIDOS_AUTOMATICOS_APOS_S:
+        if sorteio < 0.04 and time.time() - self.ligado_em > PEDIDOS_AUTOMATICOS_APOS_S:
             ev = self._solicitar_reposicao()
-        elif sorteio < 0.16:
+        elif sorteio < 0.11:
             ev = self._chegada()
+        elif sorteio < 0.18:
+            ev = self._producao()
         elif sorteio < 0.23:
             ev = self._perda()
+        elif sorteio < 0.28:
+            ev = self._despesa()
         else:
             return self._venda()
         return [ev] if ev else self._venda()
+
+    def _avaliar_excesso(self, item: dict, qtd: float, validade_dias: int, origem: str) -> dict | None:
+        """O problema que o Ciclo Zero resolve: comprar/produzir mais do que dá para vender antes de vencer.
+        Compara o que entrou com o que a loja consegue vender até a validade e com o que o agente sugeriria."""
+        media, saldo_antes = item["media_vendas_dia"], item["saldo"]
+        if media <= 0:
+            return None
+        vende_ate_vencer = media * max(validade_dias, 1)
+        sobra = min(qtd, max(0.0, saldo_antes + qtd - vende_ate_vencer))
+        custo, _ = self._preco(item["produto"])
+        if sobra < max(0.25 * qtd, 0.5) or sobra * custo < 15:  # ignora excesso pequeno (poluiria a tela)
+            return None
+        dias_ideal = 1 if origem == "producao" else min(validade_dias, tools.COBERTURA_DIAS + 2)
+        ideal = max(0.0, media * dias_ideal - saldo_antes)
+        arred = (lambda v: round(v, 1)) if item["unidade"] == "kg" else (lambda v: float(round(v)))
+        alerta = {"hora": datetime.now().strftime("%H:%M:%S"), "origem": origem, "produto": item["produto"],
+                  "unidade": item["unidade"], "quantidade": qtd, "media_dia": round(media, 1),
+                  "validade_dias": validade_dias, "sobra": arred(sobra), "ideal": arred(ideal),
+                  "excesso_rs": round(sobra * custo, 2)}
+        self.alertas.appendleft(alerta)
+        with conectar() as conn:
+            conn.execute("INSERT INTO log_agente (sessao, passo, tipo, conteudo) VALUES (?,?,?,?)",
+                         ("ao_vivo", 0, "alerta_excesso", json.dumps({**alerta, "data": date.today().isoformat()},
+                                                                     ensure_ascii=False)))
+        return alerta
 
     def _solicitar_reposicao(self) -> dict | None:
         """Reposição automática: se algo está acabando, gera rascunho de pedido (o dono aprova na aba Pedidos)."""
@@ -114,18 +146,62 @@ class Simulador:
     def _chegada(self) -> dict | None:
         """Fornecedor entrega um produto que está acabando (validade padrão do produto)."""
         itens = tools.consultar_estoque()["itens"]
-        faltando = [i for i in itens if i["saldo"] < max(i["estoque_minimo"], i["media_vendas_dia"] * 2)]
+        faltando = [i for i in itens if i["saldo"] < max(i["estoque_minimo"], i["media_vendas_dia"] * 3)
+                    and i["produto"] not in self._producao_propria()]  # pão/bolo saem do forno (ver _producao)
         if not faltando:
             return None
         item = random.choice(faltando)
         with conectar() as conn:
             dias = conn.execute("SELECT COALESCE(validade_padrao_dias, 7) d FROM produtos WHERE nome=?",
                                 (item["produto"],)).fetchone()["d"]
-        qtd = max(1.0, round(item["media_vendas_dia"] * random.uniform(2, 4), 1 if item["unidade"] == "kg" else 0))
+        # 70% compra certa (2–4 dias de venda); 30% compra exagerada (6–10 dias) -> gera risco de sobra
+        dias_cobertos = random.uniform(1.5, 3) if random.random() < 0.7 else random.uniform(5, 8)
+        qtd = max(1.0, round(item["media_vendas_dia"] * dias_cobertos, 1 if item["unidade"] == "kg" else 0))
         validade = (date.today() + timedelta(days=int(dias))).strftime("%d/%m/%Y")
         if tools.registrar_entrada(item["produto"], qtd, validade).get("ok"):
-            return self._registrar("chegada", item["produto"], qtd, item["unidade"], qtd * self._preco(item["produto"])[0])
+            ev = self._registrar("chegada", item["produto"], qtd, item["unidade"], qtd * self._preco(item["produto"])[0])
+            ev["excesso"] = self._avaliar_excesso(item, qtd, int(dias), "compra")
+            return ev
         return None
+
+    @staticmethod
+    def _producao_propria() -> set[str]:
+        with conectar() as conn:
+            return {r["nome"] for r in conn.execute("SELECT nome FROM produtos WHERE fornecedor='Produção própria'")}
+
+    def _producao(self) -> dict | None:
+        """Fornada da padaria: pão/bolo de validade curta entram no estoque (custo de insumos sai do caixa)."""
+        itens = [i for i in tools.consultar_estoque()["itens"] if i["categoria"] == "Padaria"]
+        with conectar() as conn:
+            proprios = {r["nome"]: r["validade_padrao_dias"] for r in conn.execute(
+                "SELECT nome, COALESCE(validade_padrao_dias,1) validade_padrao_dias FROM produtos "
+                "WHERE fornecedor='Produção própria'")}
+        itens = [i for i in itens if i["produto"] in proprios]
+        if not itens:
+            return None
+        item = random.choice(itens)
+        # às vezes o padeiro exagera na fornada (produção acima da venda = sobra no fim do dia)
+        fator = random.uniform(0.4, 0.8) if random.random() < 0.7 else random.uniform(1.0, 1.6)
+        qtd = max(1.0, round(item["media_vendas_dia"] * fator, 1 if item["unidade"] == "kg" else 0))
+        validade = (date.today() + timedelta(days=int(proprios[item["produto"]]))).strftime("%d/%m/%Y")
+        if tools.registrar_entrada(item["produto"], qtd, validade).get("ok"):
+            ev = self._registrar("producao", item["produto"], qtd, item["unidade"], qtd * self._preco(item["produto"])[0])
+            ev["excesso"] = self._avaliar_excesso(item, qtd, int(proprios[item["produto"]]), "producao")
+            return ev
+        return None
+
+    DESPESAS = [("Energia elétrica", 60, 220), ("Gás do forno", 40, 140), ("Embalagens", 15, 70),
+                ("Frete de fornecedor", 25, 90), ("Manutenção", 40, 180), ("Diarista/limpeza", 80, 120)]
+
+    def _despesa(self) -> dict:
+        """Conta paga no caixa (sai dinheiro, não sai produto)."""
+        categoria, minimo, maximo = random.choice(self.DESPESAS)
+        valor = round(random.uniform(minimo, maximo), 2)
+        agora = datetime.now()
+        with conectar() as conn:
+            conn.execute("INSERT INTO despesas (data, hora, categoria, descricao, valor) VALUES (?,?,?,?,?)",
+                         (date.today().isoformat(), agora.strftime("%H:%M:%S"), categoria, MOTIVO, valor))
+        return self._registrar("despesa", categoria, 1, "pagamento", valor)
 
     def _perda(self) -> dict | None:
         """Um produto estraga (pequena quantidade do lote que vence primeiro)."""
@@ -156,7 +232,12 @@ def vendas_de_hoje() -> dict:
 
 
 def financeiro_do_dia() -> dict:
-    """Resultado do dia a partir das movimentações: vendas, custo do que foi vendido, lucro, compras e perdas."""
+    """Fechamento do dia a partir das movimentações e despesas.
+
+    - Caixa do dia  = entradas (vendas) − saídas (compras/produção pagas + despesas). Pode ser negativo.
+    - Lucro do dia  = lucro bruto (vendas − custo do que foi vendido − perdas) − despesas operacionais.
+    Compras não são "prejuízo": viram estoque. Por isso caixa e lucro andam diferentes num dia de muita compra.
+    """
     hoje = date.today().isoformat()
     with conectar() as conn:
         r = conn.execute(
@@ -165,23 +246,31 @@ def financeiro_do_dia() -> dict:
                  COALESCE(SUM(CASE WHEN m.tipo='venda' THEN m.quantidade*p.preco_custo END),0)    AS custo_vendas,
                  COALESCE(SUM(CASE WHEN m.tipo='entrada' THEN m.valor END),0)                     AS compras,
                  COALESCE(SUM(CASE WHEN m.tipo='perda' THEN m.valor END),0)                       AS perdas,
-                 COALESCE(SUM(CASE WHEN m.tipo='doacao' THEN m.valor END),0)                      AS doacoes,
                  COUNT(CASE WHEN m.tipo='venda' THEN 1 END)                                        AS n_vendas
                FROM movimentacoes m JOIN produtos p ON p.id=m.produto_id WHERE m.data=?""", (hoje,)).fetchone()
+        despesas = conn.execute("SELECT COALESCE(SUM(valor),0) v FROM despesas WHERE data=?", (hoje,)).fetchone()["v"]
         pend = conn.execute("SELECT COUNT(*) n, COALESCE(SUM(valor_estimado),0) v FROM pedidos WHERE status='rascunho'"
                             ).fetchone()
-    vendas, custo = r["vendas"], r["custo_vendas"]
-    lucro = vendas - custo - r["perdas"]
-    return {"vendas_rs": round(vendas, 2), "custo_vendas_rs": round(custo, 2), "lucro_bruto_rs": round(lucro, 2),
-            "margem": (lucro / vendas) if vendas else 0.0, "compras_rs": round(r["compras"], 2),
-            "perdas_rs": round(r["perdas"], 2), "n_vendas": r["n_vendas"],
+        excessos = [json.loads(x["conteudo"]) for x in conn.execute(
+            "SELECT conteudo FROM log_agente WHERE tipo='alerta_excesso'")]
+    excessos = [e for e in excessos if e.get("data") == hoje]
+    vendas, custo, compras, perdas = r["vendas"], r["custo_vendas"], r["compras"], r["perdas"]
+    lucro_bruto = vendas - custo - perdas
+    lucro = lucro_bruto - despesas
+    saidas = compras + despesas
+    return {"vendas_rs": round(vendas, 2), "custo_vendas_rs": round(custo, 2), "compras_rs": round(compras, 2),
+            "despesas_rs": round(despesas, 2), "perdas_rs": round(perdas, 2), "saidas_caixa_rs": round(saidas, 2),
+            "caixa_rs": round(vendas - saidas, 2), "lucro_bruto_rs": round(lucro_bruto, 2), "lucro_rs": round(lucro, 2),
+            "margem": (lucro / vendas) if vendas else 0.0, "n_vendas": r["n_vendas"],
             "ticket_medio_rs": round(vendas / r["n_vendas"], 2) if r["n_vendas"] else 0.0,
-            "pedidos_pendentes": pend["n"], "pedidos_pendentes_rs": round(pend["v"], 2)}
+            "pedidos_pendentes": pend["n"], "pedidos_pendentes_rs": round(pend["v"], 2),
+            "excesso_rs": round(sum(e["excesso_rs"] for e in excessos), 2), "n_excessos": len(excessos)}
 
 
 # ------------------------------------------------------------------ interface
 def _reais(v: float) -> str:
-    return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    txt = f"R$ {abs(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return ("−" + txt) if v < 0 else txt
 
 
 _CARTOES_HTML = """
@@ -190,10 +279,10 @@ _CARTOES_HTML = """
   @media (prefers-color-scheme: dark) { :root.auto { --fundo:#1b1f24; --borda:#30363d; --texto:#f0f3f6; --sub:#9aa4ae; } }
   :root.dark { --fundo:#1b1f24; --borda:#30363d; --texto:#f0f3f6; --sub:#9aa4ae; }
   html, body { margin:0; padding:0; background:transparent; font-family:"Source Sans Pro","Source Sans 3",system-ui,sans-serif; }
-  .grade { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:10px; }
+  .grade { display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:10px; }
   .cartao { background:var(--fundo); border:1px solid var(--borda); border-radius:12px; padding:10px 12px; min-width:0; }
   .rotulo { color:var(--sub); font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .valor { color:var(--texto); font-size:clamp(18px, 2.3vw, 30px); font-weight:700; line-height:1.25; font-variant-numeric:tabular-nums;
+  .valor { color:var(--texto); font-size:clamp(16px, 2.0vw, 28px); font-weight:700; line-height:1.25; font-variant-numeric:tabular-nums;
            white-space:nowrap; transition:color .4s; }
   .delta { font-size:13px; font-weight:600; border-radius:999px; padding:1px 8px; display:inline-block; margin-top:2px;
            opacity:0; transition:opacity .3s; }
@@ -201,6 +290,7 @@ _CARTOES_HTML = """
   .bom { color:#1a7f37; background:rgba(46,160,67,.15); } .ruim { color:#cf222e; background:rgba(248,81,73,.15); }
   .neutro { color:var(--sub); background:transparent; opacity:1; }
   .pisca-bom { color:#2ea043 !important; } .pisca-ruim { color:#f85149 !important; }
+  .negativo { color:#cf222e; }
 </style>
 <div class="grade" id="g"></div>
 <script>
@@ -231,6 +321,7 @@ function quadro(agora) {
     el.textContent = fmt(c, c.de + (c.para - c.de) * ease(p));
     if (p < 1 && c.para !== c.de) el.classList.add((c.menor_melhor ? c.para < c.de : c.para > c.de) ? 'pisca-bom' : 'pisca-ruim');
     if (p >= 1) el.classList.remove('pisca-bom', 'pisca-ruim');
+    el.classList.toggle('negativo', c.tipo === 'reais' && c.para < 0 && p >= 1);
   });
   if (p < 1) requestAnimationFrame(quadro);
 }
@@ -252,18 +343,39 @@ def _cartoes(cartoes: list[dict]) -> None:
 
 
 def intervalo() -> int | None:
-    """Intervalo de atualização das abas de dados: 4 s com a loja ao vivo ligada; parado se desligada."""
-    return 4 if simulador().ativo else None
+    """Intervalo de atualização das abas de dados: 3 s com a loja ao vivo ligada; parado se desligada."""
+    return 3 if simulador().ativo else None  # mesmo ritmo do painel do topo
 
 
 def tabela_movimento():
     """Últimos lançamentos da simulação (para a aba Dashboard)."""
     import pandas as pd
-    nomes = {"venda": "🛒 Venda", "chegada": "🚚 Chegada", "perda": "🗑️ Perda", "pedido": "📝 Pedido automático"}
-    linhas = [{"hora": e["hora"], "lançamento": nomes.get(e.get("tipo"), e.get("tipo")), "item": e["produto"],
+    nomes = {"venda": "🛒 Venda (entra no caixa)", "chegada": "🚚 Compra recebida (sai do caixa)",
+             "producao": "🍞 Produção (insumos saem do caixa)", "despesa": "💸 Despesa paga",
+             "excesso": "🚨 Em excesso (vai sobrar)",
+             "perda": "🗑️ Perda (estragou)", "pedido": "📝 Pedido automático (rascunho)"}
+    linhas = [{"hora": e["hora"],
+               "lançamento": nomes.get(e.get("tipo"), e.get("tipo")) + (" · 🚨 EXCESSO" if e.get("excesso") else ""),
+               "item": e["produto"],
                "qtd": f"{e['quantidade']:g} {e['unidade']}", "valor": _reais(e.get("valor", 0))}
               for e in simulador().eventos]
     return pd.DataFrame(linhas)
+
+
+def render_alertas_excesso() -> None:
+    """O problema, mostrado na hora em que acontece: compra/produção acima do que a loja vende antes de vencer."""
+    import streamlit as st
+    for a in list(simulador().alertas)[:3]:
+        u = a["unidade"]
+        verbo = "Saíram do forno" if a["origem"] == "producao" else "Chegaram"
+        st.warning(
+            f"🚨 **{a['hora']} · {verbo} {a['quantidade']:g} {u} de {a['produto']}** — a loja vende ~{a['media_dia']:g} {u}/dia "
+            f"e vence em {a['validade_dias']} dia(s): **~{a['sobra']:g} {u} vão para o lixo "
+            f"({_reais(a['excesso_rs']).replace('$', chr(92) + '$')})**. "
+            + (f"Com o Ciclo Zero, o {'plano de produção' if a['origem'] == 'producao' else 'pedido'} sugerido seria "
+               f"**{a['ideal']:g} {u}**." if a["ideal"] > 0 else
+               f"Com o Ciclo Zero, **não {'precisava produzir' if a['origem'] == 'producao' else 'precisava comprar'} "
+               f"agora**: já havia estoque suficiente."))
 
 
 def controles() -> None:
@@ -290,19 +402,20 @@ def painel() -> None:
         vencendo = tools.listar_produtos_vencendo(3)
         perdas = tools.relatorio_desperdicio(30)
         hoje = vendas_de_hoje()
+        fin = financeiro_do_dia()
         anterior = st.session_state.get("_painel_anterior", {})
         atual = {"lotes": len(risco["lotes_em_risco"]), "em_risco": vencendo["valor_total_em_risco"],
                  "perda": risco["resumo"]["perda_total_sem_acao_rs"], "fat": hoje["faturamento_rs"],
-                 "vendas": hoje["vendas"]}
+                 "vendas": hoje["vendas"], "caixa": fin["caixa_rs"], "lucro": fin["lucro_rs"]}
 
         if sim.ativo:
             st.markdown("🟢 **Loja ao vivo** — *simulação de vendas do caixa; números atualizando em tempo real*")
         de = lambda k: anterior.get(k, atual[k])
         _cartoes([
             {"rotulo": "Vendas hoje", "tipo": "reais", "de": de("fat"), "para": atual["fat"]},
+            {"rotulo": "Caixa do dia", "tipo": "reais", "de": de("caixa"), "para": atual["caixa"]},
+            {"rotulo": "Lucro do dia", "tipo": "reais", "de": de("lucro"), "para": atual["lucro"]},
             {"rotulo": "Lotes em risco · 5 dias", "tipo": "int", "de": de("lotes"), "para": atual["lotes"],
-             "menor_melhor": True},
-            {"rotulo": "R$ em risco · 3 dias", "tipo": "reais", "de": de("em_risco"), "para": atual["em_risco"],
              "menor_melhor": True},
             {"rotulo": "Perda se nada for feito", "tipo": "reais", "de": de("perda"), "para": atual["perda"],
              "menor_melhor": True},
@@ -310,10 +423,10 @@ def painel() -> None:
              "para": perdas["total_perdas_rs"], "nota": perdas["perdas_sobre_faturamento"].replace(".", ",") + " do faturamento"},
         ])
         if sim.ativo and sim.eventos:
-            icone = {"venda": "🛒", "chegada": "🚚", "perda": "🗑️", "pedido": "📝"}
+            icone = {"venda": "🛒", "chegada": "🚚", "perda": "🗑️", "pedido": "📝", "producao": "🍞", "despesa": "💸"}
             st.caption("Movimento: " + " · ".join(
-                f"{icone.get(e.get('tipo'), '🛒')} {e['hora']} {e['quantidade']:g} {e['unidade']} {e['produto']}"
-                for e in list(sim.eventos)[:5]) + "  ·  🛒 venda  🚚 chegada  🗑️ estragou  📝 pedido automático")
+                f"{'🚨' if e.get('excesso') else icone.get(e.get('tipo'), '🛒')} {e['hora']} {e['quantidade']:g} {e['unidade']} {e['produto']}"
+                for e in list(sim.eventos)[:5]) + "  ·  🛒 venda  🍞 produção  🚚 chegada  💸 despesa  🗑️ estragou  📝 pedido")
         st.session_state["_painel_anterior"] = atual
 
     _painel()

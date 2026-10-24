@@ -33,7 +33,8 @@ def tabela(linhas):
 
 
 def reais(v: float) -> str:
-    return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    txt = f"R$ {abs(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return ("−" + txt) if v < 0 else txt
 
 
 @st.cache_resource
@@ -122,16 +123,24 @@ with aba_dash:
         fin = ao_vivo.financeiro_do_dia()
         with st.container(border=True):
             st.markdown("#### 💰 Resultado de hoje" + ("  ·  🟢 ao vivo" if ao_vivo.simulador().ativo else ""))
-            f1, f2, f3, f4, f5, f6 = st.columns(6)
-            f1.metric("Vendas", reais(fin["vendas_rs"]), f"{fin['n_vendas']} vendas", delta_color="off")
-            f2.metric("Custo do que vendeu", reais(fin["custo_vendas_rs"]))
-            f3.metric("Lucro bruto", reais(fin["lucro_bruto_rs"]), f"margem {fin['margem']:.0%}".replace(".", ","),
+            f1, f2, f3 = st.columns(3)
+            f1.metric("Entradas (vendas)", reais(fin["vendas_rs"]), f"{fin['n_vendas']} vendas", delta_color="off")
+            f2.metric("Saídas do caixa", reais(fin["saidas_caixa_rs"]),
+                      f"compras {reais(fin['compras_rs'])} · despesas {reais(fin['despesas_rs'])}".replace("$", "\\$"), delta_color="off")
+            f3.metric("Caixa do dia", reais(fin["caixa_rs"]))
+            f4, f5, f6 = st.columns(3)
+            f4.metric("Lucro do dia", reais(fin["lucro_rs"]),
+                      f"bruto {reais(fin['lucro_bruto_rs'])} · margem {fin['margem']:.0%}".replace("$", "\\$"),
                       delta_color="off")
-            f4.metric("Compras recebidas", reais(fin["compras_rs"]))
-            f5.metric("Perdas hoje", reais(fin["perdas_rs"]))
-            f6.metric("Pedidos p/ aprovar", fin["pedidos_pendentes"], reais(fin["pedidos_pendentes_rs"]),
+            f5.metric("🚨 Compras em excesso hoje", reais(fin["excesso_rs"]),
+                      f"{fin['n_excessos']} compra(s)/fornada(s) acima do que vende", delta_color="off")
+            f6.metric("Pedidos p/ aprovar", fin["pedidos_pendentes"], reais(fin["pedidos_pendentes_rs"]).replace("$", "\\$"),
                       delta_color="off")
-            st.caption("Lucro bruto = vendas − custo do que foi vendido − perdas. Ticket médio: " + reais(fin["ticket_medio_rs"]))
+            st.caption("**Caixa do dia** = vendas − (compras e produção pagas + despesas): pode fechar negativo em dia de "
+                       "muita compra. **Lucro do dia** = vendas − custo do que foi vendido − perdas − despesas. "
+                       "**Compras em excesso** = custo do que entrou além do que a loja vende antes de vencer — "
+                       "é o dinheiro que o Ciclo Zero evita gastar.")
+            ao_vivo.render_alertas_excesso()
             mov = ao_vivo.tabela_movimento()
             if not mov.empty:
                 st.markdown("##### Últimos lançamentos")
