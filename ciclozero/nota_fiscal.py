@@ -94,10 +94,85 @@ def _ler_groq(imagem: bytes, mime: str) -> tuple[dict, str]:
     raise LeituraFalhou(f"Groq: {ultimo}")
 
 
-def ler_nota(imagem: bytes, mime: str = "image/jpeg") -> dict:
-    """Lê a foto da nota com um modelo de visão (Gemini; se falhar, Groq). Devolve dados + verificação."""
+def ocr_disponivel() -> bool:
+    """True se o Tesseract (OCR local) estiver instalado: brew install tesseract tesseract-lang."""
+    try:
+        import pytesseract
+        pytesseract.get_tesseract_version()
+        return True
+    except Exception:
+        return False
+
+
+def extrair_texto_ocr(imagem: bytes) -> str:
+    """OCR local (Tesseract): roda no computador, sem enviar a imagem para a nuvem."""
+    import io
+
+    import pytesseract
+    from PIL import Image, ImageOps
+    im = Image.open(io.BytesIO(imagem))
+    im = ImageOps.exif_transpose(im).convert("L")          # foto de celular: corrige rotação, tons de cinza
+    im = ImageOps.autocontrast(im)
+    if im.width < 1600:                                      # amplia fotos pequenas: OCR erra menos
+        fator = 1600 / im.width
+        im = im.resize((int(im.width * fator), int(im.height * fator)))
+    idioma = "por" if "por" in pytesseract.get_languages() else "eng"
+    return pytesseract.image_to_string(im, lang=idioma, config="--psm 6")
+
+
+PROMPT_TEXTO = PROMPT_LEITURA.replace(
+    "Você recebe a foto de uma nota fiscal",
+    "Você recebe o TEXTO extraído por OCR de uma nota fiscal") + (
+    "\nO OCR pode ter erros pequenos (ex.: 0 no lugar de O, espaço dentro de número como '208, 80'): corrija "
+    "só quando for óbvio pelo contexto (quantidade × valor unitário = valor total). Não invente itens.")
+
+
+def _ler_ocr(imagem: bytes, mime: str) -> tuple[dict, str]:
+    """Reserva sem visão: OCR local extrai o texto e um modelo de TEXTO (Groq; se não, Gemini) organiza em JSON."""
+    if not ocr_disponivel():
+        raise LeituraFalhou("OCR local indisponível (instale o Tesseract)")
+    texto = extrair_texto_ocr(imagem)
+    if len(texto.strip()) < 20:
+        raise LeituraFalhou("OCR não encontrou texto legível na imagem")
+    pedido = PROMPT_TEXTO + "\n\nTEXTO DO OCR:\n" + texto
+    erros = []
+    if os.getenv("GROQ_API_KEY"):
+        from openai import OpenAI
+        client = OpenAI(api_key=os.getenv("GROQ_API_KEY"), base_url="https://api.groq.com/openai/v1",
+                        timeout=60, max_retries=1)
+        for modelo in [m.strip() for m in os.getenv("GROQ_MODELS", "openai/gpt-oss-120b,openai/gpt-oss-20b").split(",")
+                       if m.strip()]:
+            try:
+                resp = client.chat.completions.create(model=modelo, temperature=0,
+                                                      response_format={"type": "json_object"},
+                                                      messages=[{"role": "user", "content": pedido}])
+                return _extrair_json(resp.choices[0].message.content), f"ocr+groq:{modelo}"
+            except Exception as e:
+                erros.append(str(e)[:120])
+    if os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"):
+        from google import genai
+        from google.genai import types
+        client = genai.Client(api_key=os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+        for modelo in MODELOS_VISAO_GEMINI:
+            try:
+                resp = client.models.generate_content(model=modelo, contents=pedido, config=types.GenerateContentConfig(
+                    temperature=0, response_mime_type="application/json"))
+                return _extrair_json(resp.text), f"ocr+gemini:{modelo}"
+            except Exception as e:
+                erros.append(str(e)[:120])
+    raise LeituraFalhou("OCR leu o texto, mas nenhum modelo de texto respondeu: " + " | ".join(erros))
+
+
+LEITORES = {"visao_gemini": _ler_gemini, "ocr": _ler_ocr, "visao_groq": _ler_groq}
+ORDEM_PADRAO = [x.strip() for x in os.getenv("NOTA_LEITORES", "visao_gemini,ocr,visao_groq").split(",") if x.strip()]
+
+
+def ler_nota(imagem: bytes, mime: str = "image/jpeg", metodo: str = "auto") -> dict:
+    """Lê a foto da nota. metodo='auto' tenta, em ordem: visão do Gemini -> OCR local + IA de texto -> visão do Groq.
+    metodo='ocr' ou 'visao_gemini' força um caminho. Devolve dados + verificação."""
     t0, erros = time.time(), []
-    for leitor in (_ler_gemini, _ler_groq):
+    ordem = ORDEM_PADRAO if metodo == "auto" else [metodo]
+    for leitor in (LEITORES[m] for m in ordem if m in LEITORES):
         try:
             dados, modelo = leitor(imagem, mime)
             break

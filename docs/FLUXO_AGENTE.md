@@ -29,7 +29,7 @@
 A dor mais citada na validação foi o **trabalho manual de anotar o que chega** ("no olhômetro", horas por dia). Por isso a entrada de mercadoria pode ser feita por **foto da nota**:
 
 ```
-foto da nota ──► modelo de visão (Gemini; reserva: Groq/Llama 4) ──► JSON: fornecedor, nº, total, itens
+foto da nota ──► modelo de visão (Gemini)  |  reserva: OCR local (Tesseract) + IA de texto (Groq) ──► JSON: fornecedor, nº, total, itens
             ──► verificação: soma dos itens = total da nota? quantidade × unitário = total do item?
             ──► conciliação: cada item ↔ produto do cadastro (+ validade padrão do produto, aviso de custo diferente)
             ──► tabela editável: o dono confere e confirma  (nada entra sem confirmação)

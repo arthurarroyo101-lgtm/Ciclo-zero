@@ -49,11 +49,19 @@ def render(obter_agente) -> None:
         c1, c2 = st.columns([1, 2])
         c1.image(imagem, caption="Nota enviada", width="stretch")
         with c2:
+            opcoes_metodo = {"Automático": "auto", "Visão (Gemini)": "visao_gemini",
+                             "OCR local + IA de texto": "ocr"}
+            if not nf.ocr_disponivel():
+                opcoes_metodo.pop("OCR local + IA de texto")
+            escolha = st.radio("Como ler", list(opcoes_metodo), horizontal=True,
+                               help="Automático: tenta a visão do Gemini e, se falhar, o OCR local (Tesseract) "
+                                    "+ IA de texto. O OCR roda no seu computador.")
             if st.button("🔎 Ler nota com IA", type="primary"):
                 with st.status("Lendo a nota...", expanded=True) as status:
-                    status.write("👁️ modelo de visão extraindo fornecedor, itens e valores")
+                    status.write("👁️ lendo a nota: fornecedor, itens e valores" +
+                                 (" (OCR local + IA de texto)" if opcoes_metodo[escolha] == "ocr" else ""))
                     try:
-                        dados = nf.ler_nota(imagem, mime)
+                        dados = nf.ler_nota(imagem, mime, opcoes_metodo[escolha])
                     except nf.LeituraFalhou as e:
                         status.update(label="Não consegui ler a nota", state="error")
                         st.error(str(e))

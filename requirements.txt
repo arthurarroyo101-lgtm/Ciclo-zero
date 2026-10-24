@@ -3,3 +3,5 @@ streamlit>=1.37
 pandas
 python-dotenv
 openai>=1.40
+pytesseract  # OCR local (opcional; precisa do Tesseract instalado: brew install tesseract tesseract-lang)
+Pillow
