@@ -224,7 +224,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, [role="tab"]:
 
 /* Quieto: sem sombra, sem cartão decorativo */
 [data-testid="stVerticalBlockBorderWrapper"] { box-shadow: none !important; border-color: var(--linha) !important; }
-[data-testid="stSidebar"] { background: var(--branco); border-right: 1px solid var(--linha); }
+[data-testid="stSidebar"] { background: linear-gradient(180deg, #EEF5EF 0%, #DCEADF 100%) !important;
+                            border-right: 1px solid #C9DCCD; }
+/* na barra lateral verde-clara, caixas e botões ficam brancos para destacar */
+[data-testid="stSidebar"] [data-testid="stExpander"] details, [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] {
+    background: var(--branco) !important; border-color: #C9DCCD !important; }
+[data-testid="stSidebar"] .cz-dor { border-top-color: #C9DCCD; }
 
 /* Caixa de mensagem: onde o dono fala com o agente */
 [data-testid="stChatInput"] {
