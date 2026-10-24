@@ -25,6 +25,9 @@ Testes: `python -m tests.eval_agente` (agente, precisa de chave) e `python -m te
 - [Diário de decisões](docs/DECISOES.md)
 - [Divisão de tarefas](docs/TAREFAS.md)
 - [Roteiro da demo](docs/DEMO.md)
+- [Business Model Canvas](docs/BMC.md)
+- [Roteiro do pitch](docs/PITCH.md)
+- [Validação com comerciantes](docs/validacao.md)
 - [Avaliação automática do agente](docs/AVALIACAO.md)
 - [Fluxo do agente (inputs, lógica, outputs)](docs/FLUXO_AGENTE.md)
 

@@ -38,8 +38,8 @@ Mínimo de 2 integrantes presentes.
 
 ## Entregáveis obrigatórios (no GitHub até 15h30)
 - [x] Protótipo funcional do agente — [ ] gravar vídeo de backup
-- [ ] BMC (Business Model Canvas)
-- [ ] Pitch de 3 minutos
+- [~] BMC (Business Model Canvas) — rascunho em `docs/BMC.md`, Arthur revisa
+- [~] Pitch de 3 minutos — rascunho em `docs/PITCH.md`, Arthur revisa e ensaia
 - [x] Documentação do fluxo do agente (inputs, lógica, outputs)
 
 ## Como seremos avaliados (regional)
@@ -79,6 +79,7 @@ docs/                   → DECISOES, TAREFAS, FLUXO_AGENTE, DEMO, AVALIACAO
 Decisões de projeto: cálculos em Python (não no LLM) para evitar número inventado; FEFO na baixa de estoque; pedido de compra sempre como rascunho com aprovação humana; pedido > 2× o sugerido é bloqueado e reposição desconta pedidos em aberto; desconto máximo 50%; travas contra "contornar" recusas e contra confundir chegada com saída; máximo 8 passos por pergunta; troca automática de modelo/provedor.
 
 ## Log
+- **2026-10-24 02:10** — Rascunhos de `docs/BMC.md` e `docs/PITCH.md` (para o Arthur revisar), com dados públicos com fonte (ABRAS 2020: perdas 1,79% do faturamento; FLV 5,25%; padaria 2,74%) e hipóteses marcadas. Pitch abre com a dor **validada** (controle manual de estoque) em vez de desperdício. Teste offline da nota: 8/8 no computador do Matheus.
 - **2026-10-24 02:05** — **Aprendizado por loja (ativo próprio, parâmetro 3 do edital):** nova tabela `apelidos`; cada linha de nota confirmada/corrigida vira associação aprendida, usada primeiro na próxima leitura (confiança 100%, coluna "Como associou"). Contador "📚 X descrições aprendidas" na aba. 2ª nota de exemplo (`nota_exemplo_laticinios.png`) com descrições difíceis, item de baixa confiança e custo acima do cadastro. Teste offline 8/8. **Decidido NÃO emitir NF-e** (exige certificado digital/SEFAZ; gerar nota com aparência real seria documento falso) → alternativa sugerida ao João: mensagem de pedido pronta para o fornecedor ao aprovar. Áudio: em discussão com a equipe.
 - **2026-10-24 01:45** — **Entrada multimodal por foto da nota fiscal** (aba 📷): visão (Gemini → reserva Groq/Llama 4) extrai itens em JSON; verificação automática (soma dos itens × total da nota; qtd × unitário); conciliação com o cadastro (sinônimos, validade padrão por produto — novo campo `validade_padrao_dias` com migração automática); tabela editável; nada entra sem confirmação; item desconhecido não é lançado; depois de lançar, o agente avalia na hora se a compra vai sobrar. Motivação: (1) edital pede agentes de ponta a ponta com mínimo de intervenção humana e valoriza interfaces multimodais; (2) **validação do Arthur** mostrou que a dor real relatada é o trabalho manual de anotar estoque. Nota de exemplo fictícia em `docs/exemplos/`. Teste offline `tests/test_nota_fiscal.py` (6/6). Interface em módulo separado (`ciclozero/ui_nota.py`) para não conflitar com o João. Roteiro da demo atualizado.
 - **2026-10-24 01:35** — **PR #2 do João aceito** (agente não inventa parâmetro de ferramenta; remove marcas 【…】; C12 mais rígido). **Arthur subiu `docs/validacao.md`**: 2 entrevistas (Canto Caseiro: dor = controle manual de estoque, pagaria se acessível; Subway: sem dor). Conclusão: a dor validada é **controle de estoque/trabalho manual**, não desperdício em si → pitch deve liderar com isso.
