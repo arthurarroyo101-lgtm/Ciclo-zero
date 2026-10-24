@@ -415,7 +415,7 @@ def painel() -> None:
              "menor_melhor": True},
             {"rotulo": "Vai para o lixo", "tipo": "reais", "de": de("perda"), "para": atual["perda"],
              "menor_melhor": True, "destaque": True},
-            {"rotulo": "Jogado fora no mês", "tipo": "reais", "de": perdas["total_perdas_rs"],
+            {"rotulo": "Jogado fora (mês)", "tipo": "reais", "de": perdas["total_perdas_rs"],
              "para": perdas["total_perdas_rs"], "nota": perdas["perdas_sobre_faturamento"].replace(".", ",") + " do faturamento"},
         ])
         if sim.ativo and sim.eventos and st.session_state.get("tecnico"):

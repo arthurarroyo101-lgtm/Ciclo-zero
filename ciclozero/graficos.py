@@ -117,7 +117,7 @@ def dados_top_desperdicio(relatorio: dict, n: int = 5) -> pd.DataFrame:
 
 # ------------------------------------------------------------------ gráficos
 
-FONTE = "Atkinson Hyperlegible"
+FONTE = "Atkinson Hyperlegible, Arial, sans-serif"  # reserva sem serifa se a fonte não carregar no gráfico
 
 
 def _alt():
@@ -151,7 +151,7 @@ def grafico_vendas_x_perdas(df: pd.DataFrame):
     cores = alt.Scale(domain=["Vendas", "Perdas"], range=[COR_VENDAS, COR_PERDAS])
     base = alt.Chart(df).encode(
         x=alt.X("data:T", title=None, axis=alt.Axis(format="%d/%m")),
-        color=alt.Color("serie:N", scale=cores, title=None, legend=alt.Legend(orient="top")),
+        color=alt.Color("serie:N", scale=cores, title=None, legend=alt.Legend(orient="bottom", direction="horizontal")),
         tooltip=[alt.Tooltip("data_fmt:N", title="Dia"), alt.Tooltip("serie:N", title="Série"),
                  alt.Tooltip("valor_fmt:N", title="Valor")],
     )
@@ -171,9 +171,9 @@ def grafico_lotes_em_risco(df: pd.DataFrame):
         alt.Chart(df)
         .mark_bar(cornerRadiusEnd=2, stroke="#1D2B22", strokeWidth=0.6)  # contorno: amarelo some no branco
         .encode(
-            x=alt.X("perda:Q", title="Perda se nada for feito (R$, custo)"),
-            y=alt.Y("rotulo:N", sort=ordem, title=None, axis=alt.Axis(labelLimit=320)),
-            color=alt.Color("acao:N", scale=cores, title="Ação recomendada", legend=alt.Legend(orient="top")),
+            x=alt.X("perda:Q", title="Perda sem ação (R$)"),
+            y=alt.Y("rotulo:N", sort=ordem, title=None, axis=alt.Axis(labelLimit=320, labelOverlap=False)),
+            color=alt.Color("acao:N", scale=cores, title="Ação recomendada", legend=alt.Legend(orient="bottom", direction="horizontal")),
             tooltip=[alt.Tooltip("rotulo:N", title="Lote"), alt.Tooltip("acao:N", title="Ação"),
                      alt.Tooltip("detalhe:N", title="Detalhe"), alt.Tooltip("perda_fmt:N", title="Perda sem ação")],
         )

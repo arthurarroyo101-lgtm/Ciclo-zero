@@ -317,9 +317,10 @@ def cabecalho_lateral() -> None:
     """Boas-vindas com o nome da pessoa, marca do Ciclo Zero e o porquê do controle de estoque."""
     from html import escape
 
-    nome = escape(nome_usuario())
+    nome = escape(nome_usuario(padrao=""))
+    saudacao = f"Bem-vindo, <b>{nome}</b>!" if nome else "Bem-vindo!"
     st.markdown(
-        f"<div class='cz-boasvindas'>Bem-vindo, <b>{nome}</b>!<br>"
+        f"<div class='cz-boasvindas'>{saudacao}<br>"
         "Sou o agente que te ajuda no controle de estoque.</div>"
         f"<div class='cz-marca'>{_logo_html()}<span class='cz-nome'>Ciclo Zero</span></div>"
         f"<div class='cz-dor'><h4>Controle de estoque sem complicação</h4><p>{TEXTO_DOR}</p></div>",

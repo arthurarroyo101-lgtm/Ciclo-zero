@@ -193,7 +193,7 @@ with aba_dash:
             else:
                 st.caption(f"{len(df_lotes)} lote(s) vencem em até 5 dias e não vai dar tempo de vender tudo. "
                            f"Se nada for feito, você perde **{graficos.reais(df_lotes['perda'].sum())}**.")
-                st.altair_chart(graficos.grafico_lotes_em_risco(df_lotes), width="stretch")
+                st.altair_chart(graficos.grafico_lotes_em_risco(df_lotes), width="stretch", height=max(220, 34 * len(df_lotes) + 90))
         with col_b:
             st.markdown("#### Os 5 produtos que você mais joga fora")
             if df_top.empty:
@@ -209,9 +209,9 @@ with aba_dash:
             if df_dia.empty:
                 st.info("Sem movimentações no período.")
             else:
-                st.caption(f"Você vendeu {graficos.reais(perdas['faturamento_rs'])} e perdeu "
-                           f"{graficos.reais(perdas['total_perdas_rs'])}, o equivalente a "
-                           f"{perdas['perdas_sobre_faturamento']} do que vendeu."
+                st.caption((f"Você vendeu {graficos.reais(perdas['faturamento_rs'])} e perdeu "
+                            f"{graficos.reais(perdas['total_perdas_rs'])}, o equivalente a "
+                            f"{perdas['perdas_sobre_faturamento'].replace('.', ',')} do que vendeu.").replace("$", "\\$")
                            + (" Cada linha tem sua própria escala, para as perdas não sumirem no gráfico." if tecnico else ""))
                 st.altair_chart(graficos.grafico_vendas_x_perdas(df_dia), width="stretch")
 
