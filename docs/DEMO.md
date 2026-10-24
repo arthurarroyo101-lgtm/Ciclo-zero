@@ -8,23 +8,24 @@
 - [ ] Internet: Wi-Fi do evento testado **e** roteador do celular pronto
 - [ ] `.env` com `GROQ_API_KEY` e `GEMINI_API_KEY` (reserva automática)
 - [ ] `streamlit run app.py` rodando, navegador em tela cheia (⌃⌘F), zoom 125% (⌘+)
-- [ ] Barra lateral → **🔄 Recriar dados de exemplo** (deixa os números iguais aos do roteiro e zera pedidos)
-- [ ] Abrir a aba **📊 Dashboard**
-- [ ] **🔧 Modo técnico DESLIGADO** (visão limpa do comerciante); ligar só no último passo (Rastreio)
+- [ ] Barra lateral → **Recriar dados de exemplo** (deixa os números iguais aos do roteiro, zera pedidos, alertas e o relógio da loja)
+- [ ] Barra lateral → Personalizar → **Nome da loja**: `Padaria Canto Caseiro` (aparece na mensagem ao fornecedor)
+- [ ] Abrir o botão **Dashboard**
+- [ ] **Modo técnico DESLIGADO** (visão limpa do comerciante); ligar só no último passo (Rastreio)
 - [ ] **Loja ao vivo DESLIGADA** até começar a demo (liga no primeiro passo; pedidos automáticos só começam 3 min depois de ligar)
 - [ ] Vídeo de backup aberto em outra janela (plano B)
 - [ ] Notificações do Mac desligadas (Foco → Não perturbe)
 
-## Roteiro (≈ 80 s)
+## Roteiro (≈ 85 s)
 
 | Tempo | Tela / ação | O que falar |
 |---|---|---|
-| 0–15 s | **📊 Dashboard** (já aberto) → ligar **🟢 Loja ao vivo** na barra lateral | "Essa é uma padaria de bairro, aberta agora — vendas, fornadas, compras e despesas acontecendo em tempo real *(simulação acelerada)*. Em 30 dias ela jogou fora **R$ 1.284** em comida. E olha o problema acontecendo: 🚨 **compra em excesso** — chegou mais do que ela consegue vender antes de vencer. Isso é dinheiro que sai do caixa e vira lixo." *(apontar o bloco 💰 Resultado de hoje e o alerta amarelo)* |
-| 15–35 s | Aba **📷 Nota fiscal** → "Exemplo: Ceasa" → **Ler nota** → **Lançar no estoque** | "Chegou mercadoria. Em vez de anotar no caderno — que foi a maior dor que ouvimos dos comerciantes — ele tira **foto da nota**. A IA lê os itens, confere se a soma bate com o total, associa ao estoque e sugere a validade. O dono só confirma. E olha: o agente já avisa que **40 kg de banana vão sobrar** antes de vencer." |
-| 35–60 s | Aba **💬 Agente** → clicar **▶️ Rodar rotina diária** | **Enquanto roda (≈25 s), explicar o fluxo:** "Toda manhã o agente faz sozinho a abertura da loja. **Entrada:** estoque, validades e 30 dias de vendas. **Lógica:** ele projeta, lote a lote, o que não vai ser vendido antes de vencer — esse cálculo é feito em código, não pelo modelo, então ele não inventa número. **Saída:** um plano de ação e os pedidos de compra." |
+| 0–15 s | **Dashboard** (já aberto) → ligar **Loja ao vivo** na barra lateral | "Essa é uma padaria de bairro, aberta agora — o relógio da loja anda acelerado e as vendas, fornadas, compras e contas acontecem em tempo real *(simulação)*. Em 30 dias ela jogou fora **R$ 1.284** em comida." Quando aparecer a **notificação amarela** no canto: "Olha o problema acontecendo: chegou mais do que ela vende antes de vencer — isso vira lixo. Se o dono não viu, fica tudo na aba **Alertas**." *(a notificação pode levar ~30 s; se não vier, seguir e mostrar na volta)* |
+| 15–35 s | **Nota fiscal** → "Exemplo: Ceasa" → **Ler nota** → **Lançar no estoque** | "Chegou mercadoria. Em vez de anotar no caderno — que foi a maior dor que ouvimos dos comerciantes — ele tira **foto da nota**. A IA lê os itens, confere se a soma bate com o total, associa ao estoque e sugere a validade. O dono só confirma. E olha: o agente já avisa que **40 kg de banana vão sobrar** antes de vencer." |
+| 35–60 s | **Agente** → clicar **Rodar rotina diária** | **Enquanto roda (≈25 s), explicar o fluxo:** "Toda manhã o agente faz sozinho a abertura da loja. **Entrada:** estoque, validades e 30 dias de vendas. **Lógica:** ele projeta, lote a lote, o que não vai ser vendido antes de vencer — esse cálculo é feito em código, não pelo modelo, então ele não inventa número. **Saída:** um plano de ação e os pedidos de compra." |
 | 60–70 s | Resposta aparece → apontar o resumo | "Sem fazer nada, essa loja perderia **R$ 490**. Com as promoções sugeridas ela recupera **R$ 277** em vendas, e **R$ 244** viram doação em vez de lixo. E ele já montou os pedidos — sem comprar a mais." |
-| 70–77 s | Aba **🧾 Pedidos** → clicar **✅ Aprovar** em um | "Compra é decisão do dono: o agente só cria rascunho, quem aprova é humano. Aprovou: vira 'a pagar'; quando o fornecedor entrega, entra no estoque e sai do caixa." |
-| 77–80 s | Ligar **🔧 Modo técnico** → aba **🔍 Rastreio** | "E tudo é auditável: cada passo, cada número. Nosso teste automático passou em **16 casos**, com **100% de fidelidade** — zero valor inventado." |
+| 70–80 s | **Pedidos** → **Aprovar pedido** em um → abrir **Mensagem para o fornecedor** | "Compra é decisão do dono: o agente só cria rascunho, quem aprova é humano. Aprovou: a mensagem do pedido já sai pronta para o WhatsApp do fornecedor." *(opcional, 5 s: **Estoque** → plaquinhas de oferta prontas para imprimir)* |
+| 80–85 s | Ligar **Modo técnico** → **Rastreio** | "E tudo é auditável: cada passo, cada número. Nosso teste automático passou em **16 casos**, com **100% de fidelidade** — zero valor inventado." |
 
 > Com a Loja ao vivo ligada, os valores de risco **mudam a cada poucos segundos** (as vendas consomem os lotes). Os valores (R$ 1.284 / R$ 490 / R$ 277 / R$ 244) são os dos dados de exemplo **depois de "Recriar dados de exemplo" e ANTES de lançar a nota**. Depois da nota, a rotina mostra números maiores (a banana extra entra no risco) — **falar o que estiver na tela**.
 > Se sobrar tempo ou na pergunta da banca: **"Exemplo: Laticinios"** mostra um item com confiança baixa ("IOG NAT DANONE") e um aviso de custo acima do cadastro; depois de confirmar, a mesma nota volta com "aprendido" — **a loja ensina o sistema**.
@@ -38,11 +39,12 @@
 | Problema | O que fazer |
 |---|---|
 | Leitura da nota falhar ou demorar > 20 s | Pular para a aba Agente e digitar: `Chegaram 30 unidades de leite integral com validade 30/12/2026` |
-| Groq fora do ar | Nada — o agente troca sozinho para o Gemini (aparece 🔁). Falar: "olha a resiliência: trocou de provedor sozinho." |
+| Groq fora do ar | Nada — o agente troca sozinho para o Gemini (aparece o aviso de troca). Falar: "olha a resiliência: trocou de provedor sozinho." |
 | Rotina demorando > 40 s | Continuar falando o fluxo; se passar de 60 s, ir para o vídeo |
 | Sem internet / tudo falhou | **Vídeo de backup** (o edital aceita demo gravada) |
-| Rotina diária não criou pedidos (a loja ao vivo ficou ligada > 3 min e a reposição automática já os criou) | Falar: "a reposição automática já tinha gerado os pedidos" e mostrar na aba 🧾 Pedidos |
-| Simulação atrapalhando (números pulando demais na hora de explicar) | Desligar o 🟢 Loja ao vivo na barra lateral; o resto continua igual |
+| Rotina diária não criou pedidos (a loja ao vivo ficou ligada > 3 min e a reposição automática já os criou) | Falar: "a reposição automática já tinha gerado os pedidos" e mostrar em **Pedidos** |
+| Simulação atrapalhando (números pulando demais na hora de explicar) | Desligar **Loja ao vivo** na barra lateral; o resto continua igual |
+| A loja "fechou" (20h no relógio) no meio da demo | Normal: o dia vira, os contadores zeram e o dia anterior aparece na faixa verde. Falar: "fechou o caixa e já começou o dia seguinte" |
 | Erro na tela | Não tentar consertar ao vivo: vídeo |
 
 ## Gravar o vídeo de backup (hoje ou amanhã até 13h)

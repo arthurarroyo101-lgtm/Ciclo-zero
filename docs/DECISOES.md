@@ -128,3 +128,11 @@ Decisões de projeto: cálculos em Python (não no LLM) para evitar número inve
 - **2026-10-23 21:10** — Primeiro push feito. Commits usam o e-mail noreply do GitHub (o GitHub bloqueia push que expõe e-mail privado).
 - **2026-10-23 21:00** — Confirmado: hackathon presencial Centro-Oeste (24/10). Tema da inscrição: Ciclo Zero (desperdício de alimentos em pequenos comércios). Repositório criado pelo Arthur (`arthurarroyo101-lgtm/Ciclo-zero`). Sem créditos AWS → Gemini gratuito. Divisão de tarefas aceita. A equipe conhece comerciantes para validação.
 - **2026-10-23 20:50** — Análise do edital feita; definidos critérios, entregáveis e stack sugerida (Python + Streamlit + SQLite + LLM com function calling).
+
+## 24/10 tarde — painel "de loja de verdade" (Matheus)
+- **Relógio da loja** (`ciclozero/relogio.py`): com a Loja ao vivo, o dia anda acelerado (7h–20h, ~6 min). Às 20h fecha: guarda o resumo, zera os contadores do dia, baixa os lotes vencidos como perda e começa o dia seguinte. Antes os números só subiam (R$ 49 mil num "dia"), o que não é realista.
+- Pedido aprovado só chega ~3 h (do relógio da loja) depois de aprovar. Padaria só assa o que está acabando (15% das vezes exagera: é o problema que mostramos).
+- Alertas de compra em excesso viraram **notificação animada** (some em ~12 s ou no X) + **aba Alertas** do dia, agrupada por produto.
+- **Mensagem pronta para o fornecedor** (WhatsApp) no pedido aprovado e **plaquinhas de oferta** para imprimir (aba Estoque). Preços vêm do cálculo do agente; nada fiscal é emitido.
+- Painel com o sistema visual da landing (Manrope/Archivo leves, verde em degradê, barra lateral verde-clara). Paleta e modelos em `docs/DESIGN.md`.
+- Bug: resposta do agente com vários "R$" virava fórmula matemática no Streamlit e quebrava a tela → o "$" é protegido ao exibir.
