@@ -22,6 +22,13 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 os.environ["CICLOZERO_DB"] = str(RAIZ / "eval.db")  # banco separado: não mexe no da demo
+# chaves só para testes (no .env): assim a avaliação nunca gasta a cota da chave da demo
+from dotenv import load_dotenv  # noqa: E402
+load_dotenv(RAIZ / ".env")
+for _var in ("GROQ_API_KEY", "GEMINI_API_KEY"):
+    if os.getenv(f"{_var}_TESTES"):
+        os.environ[_var] = os.environ[f"{_var}_TESTES"]
+        print(f"(usando {_var}_TESTES do .env)")
 sys.path.insert(0, str(RAIZ))
 
 from ciclozero.db import conectar  # noqa: E402
