@@ -37,10 +37,10 @@
 Mínimo de 2 integrantes presentes.
 
 ## Entregáveis obrigatórios (no GitHub até 15h30)
-- [ ] Protótipo funcional do agente (demo ao vivo **ou gravada** — gravar backup!)
+- [x] Protótipo funcional do agente — [ ] gravar vídeo de backup
 - [ ] BMC (Business Model Canvas)
 - [ ] Pitch de 3 minutos
-- [ ] Documentação do fluxo do agente (inputs, lógica, outputs)
+- [x] Documentação do fluxo do agente (inputs, lógica, outputs)
 
 ## Como seremos avaliados (regional)
 | Critério | Peso | O que precisamos mostrar |
@@ -73,6 +73,7 @@ docs/FLUXO_AGENTE.md    → entregável: inputs, lógica, outputs (Arthur revisa
 Decisões de projeto: cálculos em Python (não no LLM) para evitar número inventado; FEFO na baixa de estoque; pedido de compra sempre como rascunho com aprovação humana; pedido > 2× o sugerido é bloqueado; desconto máximo 50%; máximo 8 passos por pergunta; modelo configurável por `GEMINI_MODEL` (padrão `gemini-3.8-flash`).
 
 ## Log
+- **2026-10-24 00:27** — ✅ **Avaliação final v5: 11/11 casos, fidelidade 100%, latência média 14 s** (rotina 47 s nesta rodada por limite por minuto do Groq; sozinha ~25–28 s). **Agente congelado** — a partir daqui só correções críticas.
 - **2026-10-24 00:25** — Avaliação v4: 10/11, fidelidade 100%. C08 ainda falhava: o agente nem tentou a entrada, foi direto em `registrar_saida(perda)` (interpretou "chegou vencido" como perda). Correções em 3 camadas: regra no prompt (chegou = entrada; mercadoria vencida na chegada é devolvida ao fornecedor), trava de intenção no código (mensagem só de chegada bloqueia saída) e regra de negócio (perda por vencimento só consome lotes vencidos).
 - **2026-10-23 23:05** — Avaliação v3 (11 casos): 10/11. **Bug real achado pelo teste C08:** com a entrada vencida recusada, o agente registrou 20 iogurtes como *perda* tirando do estoque bom. Correção: guardrail no código — após uma alteração de estoque recusada, outra alteração diferente na mesma pergunta é bloqueada (o agente tem que perguntar ao usuário) + regra explícita no prompt. Fidelidade 80% era falso alarme do teste (agente repetiu R$ informados pelo próprio usuário no C11); métrica corrigida para aceitar números da pergunta e dos argumentos. C08 agora confere também o saldo do iogurte.
 - **2026-10-23 23:00** — Observabilidade: cada chamada ao LLM registrada (provedor, modelo, ms, erro) e cada pergunta com tempo total; painel "Saúde do agente" na aba Rastreio (tempo médio, p95, taxa de erro, uso de reserva, erros de ferramenta) — `ciclozero/metricas.py`. Nova ferramenta `cadastrar_produto` (só com dados do usuário; bloqueia duplicado/nome parecido). Novo caso de teste C11 (cadastro). Justificativa de agente único documentada em `FLUXO_AGENTE.md`.
