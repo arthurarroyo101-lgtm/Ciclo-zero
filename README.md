@@ -4,6 +4,8 @@
 
 Projeto do AKCIT Camp 2026 — Hackathon Regional Centro-Oeste.
 
+**▶ [Vídeo da demonstração](https://drive.google.com/file/d/1ec6oWgYvfg5BYp_9FomMnF2jGmKfEG60/view?usp=sharing)** (gravação do protótipo funcionando; dados fictícios)
+
 ## Equipe
 - Matheus de Melo Sari ([@matheussari](https://github.com/matheussari)) — agente de IA e ferramentas.
 - João Paulo Pires de Mello ([@joaopaulo167](https://github.com/joaopaulo167)) — interface e dados.

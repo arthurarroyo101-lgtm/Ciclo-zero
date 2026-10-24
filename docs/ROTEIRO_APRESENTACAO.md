@@ -4,6 +4,8 @@
 > **Landing page:** não entra no tempo do pitch. Fica aberta numa aba para a hora das perguntas (ex.: "como o cliente conheceria o produto?") e o link vai no README.
 > Fala detalhada de cada slide: `docs/estudo/JOAO.md`. Cliques da demo: `docs/DEMO.md`.
 
+> **Vídeo de reserva (gravado):** https://drive.google.com/file/d/1ec6oWgYvfg5BYp_9FomMnF2jGmKfEG60/view?usp=sharing. Deixe também o arquivo .mov aberto no QuickTime: funciona sem internet.
+
 ## Quem faz o quê
 | Pessoa | No palco |
 |---|---|

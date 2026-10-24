@@ -3,6 +3,8 @@
 > A demo ocupa ~80 s dos 3 min de pitch. Quem opera: **Matheus** (computador). Quem fala: **João Paulo** (apresentador do pitch).
 > Regra: **ensaiar 3 vezes com cronômetro** antes das 15h30.
 
+> **Vídeo de reserva (gravado):** https://drive.google.com/file/d/1ec6oWgYvfg5BYp_9FomMnF2jGmKfEG60/view?usp=sharing. Deixe também o arquivo .mov aberto no QuickTime: funciona sem internet.
+
 ## Checklist antes de subir no palco (5 min antes)
 - [ ] Notebook carregado + carregador na tomada
 - [ ] Internet: Wi-Fi do evento testado **e** roteador do celular pronto
