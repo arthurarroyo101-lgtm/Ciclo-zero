@@ -1,4 +1,4 @@
-# Estudo: Arthur (negócio, validação e pitch)
+# Estudo: Arthur (negócio, validação e roteiro do pitch)
 
 > Leia só este arquivo. Ele resume o que **você** precisa saber para apresentar e responder à banca.
 > Pitch às 16h. Tudo no GitHub até 15h30. Slides: `docs/pitch.pdf` (falas nas notas de cada slide).
@@ -9,8 +9,9 @@
 - **Frase de fechamento:** "Não dá para recuperar o que já venceu. Mas dá para decidir melhor antes."
 
 ## 2. Seu papel no dia
-- **Conduzir o pitch** (os slides seguem o seu `PITCH.md`). O Matheus opera a demo no slide 5.
-- Responder às perguntas de **negócio, mercado e validação**.
+- **Quem apresenta é o João Paulo** (a fala dele está no `JOAO.md`, baseada no seu `PITCH.md`). O Matheus opera a demo no slide 5.
+- Você é o **dono das perguntas de negócio, mercado e validação** depois do pitch, e quem confere se a fala do João não promete nada além do que foi validado.
+- Ensaie com o João: cronometre e corrija.
 - **Confirmar com a organização se o pitch tem 3 ou 5 minutos.** Se for 3, pular os slides 3 (Sem e com) e 7 (Validação) e falar a validação junto com o slide 2.
 
 ## 3. Os slides e o tempo (versão de 5 min)
@@ -65,5 +66,5 @@
 
 ## 8. Não esqueça
 - Ensaiar com cronômetro, os três juntos, com a demo no meio.
-- Combinar a frase de passagem para a demo: "Matheus, mostra pra gente."
+- Combinar com o João a frase de passagem para a demo: "Matheus, mostra pra gente."
 - Ter o `BMC.md` aberto, caso a banca peça detalhes.

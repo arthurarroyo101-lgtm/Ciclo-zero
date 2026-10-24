@@ -1,6 +1,6 @@
 # Roteiro da demo — Ciclo Zero
 
-> A demo ocupa ~80 s dos 3 min de pitch. Quem opera: **Matheus** (computador). Quem fala: quem estiver apresentando o pitch (ou o próprio Matheus).
+> A demo ocupa ~80 s dos 3 min de pitch. Quem opera: **Matheus** (computador). Quem fala: **João Paulo** (apresentador do pitch).
 > Regra: **ensaiar 3 vezes com cronômetro** antes das 15h30.
 
 ## Checklist antes de subir no palco (5 min antes)

@@ -9,7 +9,7 @@
 - **Validação:** Canto Caseiro (dor real: controle manual) e Subway (sem dor: a franquia já tem sistema). Nosso cliente é quem ainda controla o estoque na mão.
 
 ## 2. Seu papel no dia
-- **Operar o computador na demo** (cerca de 85 s, slide 5). Roteiro em `docs/DEMO.md`.
+- **Quem apresenta o pitch é o João Paulo.** Você **opera o computador na demo** (cerca de 85 s, quando ele chamar no slide 5). Roteiro em `docs/DEMO.md`.
 - Responder às **perguntas técnicas** da banca.
 - Antes de subir: rodar o `streamlit run app.py`, **Recriar dados de exemplo**, nome da loja "Padaria Canto Caseiro", Modo técnico desligado, Loja ao vivo desligada, vídeo de reserva aberto.
 
