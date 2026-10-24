@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 
-from ciclozero import tools, ui_agente
+from ciclozero import mensagens, tools, ui_agente
 from ciclozero.db import DB_PATH, conectar, criar_tabelas
 
 load_dotenv()
@@ -63,6 +63,8 @@ with st.sidebar:
     with st.expander("Personalizar"):
         st.text_input("Seu nome", key="nome_usuario", placeholder="Ex.: João",
                       help="Aparece na mensagem de boas-vindas. Com login configurado, o nome vem dele.")
+        st.text_input("Nome da loja", key="nome_loja", placeholder="Ex.: Padaria Canto Caseiro",
+                      help="Usado na mensagem de pedido para o fornecedor.")
     if st.button("Recriar dados de exemplo", icon=":material/restart_alt:"):
         from ciclozero.seed import popular
         _ao_vivo.simulador().parar()  # não escrever no banco enquanto ele é recriado
@@ -232,6 +234,7 @@ with aba_painel:
     def _aba_estoque():
         risco = tools.analisar_risco_desperdicio()
         perdas = tools.relatorio_desperdicio(30)
+        mensagens.render_plaquinhas()  # plaquinhas de oferta prontas para imprimir
         st.subheader("Perto de vencer, sem tempo de vender tudo")
         if risco["lotes_em_risco"]:
             st.dataframe(tabela(risco["lotes_em_risco"]), width="stretch", hide_index=True)
@@ -271,6 +274,7 @@ with aba_pedidos:
                                  help="A mercadoria chegou. Ela entra no estoque e o valor sai do caixa."):
                         tools.receber_pedido(p["id"])
                         st.rerun()
+                    mensagens.render_mensagem_pedido(p)  # texto pronto para o WhatsApp do fornecedor
     _aba_pedidos()
 
 with aba_log:
