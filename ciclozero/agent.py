@@ -31,6 +31,9 @@ from .tools import FERRAMENTAS, data_br
 load_dotenv()
 
 MODELO = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+# se o modelo principal estiver fora do ar/lento (503/504/429), o agente troca para estes, em ordem
+MODELOS_RESERVA = [m.strip() for m in os.getenv(
+    "GEMINI_MODELOS_RESERVA", "gemini-flash-latest,gemini-flash-lite-latest,gemini-3.8-flash").split(",") if m.strip()]
 MAX_PASSOS = 8
 # nível de raciocínio do modelo: "minimal", "low", "medium" ou "high" (menos = mais rápido)
 NIVEL_RACIOCINIO = os.getenv("GEMINI_THINKING", "low")
@@ -114,29 +117,42 @@ class AgenteCicloZero:
         )
 
     def _gerar(self, contents):
-        # tenta de novo em caso de limite de cota/instabilidade do plano gratuito
-        for tentativa in range(4):
-            try:
-                return self.client.models.generate_content(model=self.modelo, contents=contents, config=self.config)
-            except Exception as e:
-                msg = str(e)
-                # modelo que não aceita nível de raciocínio: tira a opção e tenta de novo
-                if "thinking" in msg.lower() and self.config.thinking_config is not None:
-                    tc = self.config.thinking_config
-                    if tc.thinking_level is not None:
-                        # modelos 2.x usam "orçamento" de raciocínio em vez de nível: 0 = mais rápido
-                        orcamento = {"minimal": 0, "low": 512, "medium": 2048}.get(NIVEL_RACIOCINIO, -1)
-                        self.config.thinking_config = types.ThinkingConfig(thinking_budget=orcamento)
-                        self._avisar(f"ℹ️ modelo usa orçamento de raciocínio; usando {orcamento}")
-                    else:
-                        self.config.thinking_config = None
-                        self._avisar("ℹ️ modelo não aceita configurar raciocínio; seguindo sem")
-                    continue
-                # erro de configuração (modelo inexistente, chave inválida): não adianta tentar de novo
-                if tentativa == 3 or any(c in msg for c in ("404", "401", "403", "API key", "INVALID_ARGUMENT")):
-                    raise
-                self._avisar(f"⏳ API instável ({msg[:80]}...), tentando de novo")
-                time.sleep(4 * (tentativa + 1))
+        """Chama o Gemini com novas tentativas e troca de modelo se o atual estiver indisponível."""
+        candidatos = [self.modelo] + [m for m in MODELOS_RESERVA if m != self.modelo]
+        ultimo_erro = None
+        for modelo in candidatos:
+            for tentativa in range(2):
+                try:
+                    resp = self.client.models.generate_content(model=modelo, contents=contents, config=self.config)
+                    if modelo != self.modelo:
+                        self._avisar(f"🔁 usando o modelo reserva {modelo}")
+                        self.modelo = modelo  # mantém o que funcionou para os próximos passos
+                    return resp
+                except Exception as e:
+                    msg, ultimo_erro = str(e), e
+                    # ajusta a configuração de raciocínio conforme a família do modelo
+                    if "thinking" in msg.lower() and self.config.thinking_config is not None:
+                        tc = self.config.thinking_config
+                        if tc.thinking_level is not None:
+                            orcamento = {"minimal": 0, "low": 512, "medium": 2048}.get(NIVEL_RACIOCINIO, -1)
+                            self.config.thinking_config = types.ThinkingConfig(thinking_budget=orcamento)
+                        elif tc.thinking_budget is not None and NIVEL_RACIOCINIO:
+                            self.config.thinking_config = types.ThinkingConfig(thinking_level=NIVEL_RACIOCINIO)
+                        else:
+                            self.config.thinking_config = None
+                        try:
+                            resp = self.client.models.generate_content(model=modelo, contents=contents, config=self.config)
+                            self.modelo = modelo
+                            return resp
+                        except Exception as e2:
+                            msg, ultimo_erro = str(e2), e2
+                    if any(c in msg for c in ("401", "403", "API key")):
+                        raise  # chave errada: trocar de modelo não resolve
+                    if any(c in msg for c in ("404", "INVALID_ARGUMENT")):
+                        break  # modelo não existe/não aceita: vai para o próximo
+                    self._avisar(f"⏳ {modelo} indisponível ({msg[:60]}...)")
+                    time.sleep(3 * (tentativa + 1))
+        raise ultimo_erro
 
     def _avisar(self, texto: str) -> None:
         if self.ao_passo:
