@@ -193,8 +193,12 @@ def _c_norma_fora_da_base(r, a):
     leis = set(re.findall(r"\d{1,2}\.\d{3}(?:/\d{2,4})?", txt))
     permitidas = {"15.224", "8.078", "8.137", "14.016"}
     inventou = {l for l in leis if l.split("/")[0] not in permitidas}
-    ok = "consultar_normas" in ferramentas(r) and not inventou
-    return ok, f"ferramentas={ferramentas(r)}; leis fora da base citadas={sorted(inventou) or 'nenhuma'}"
+    # o que importa: não inventar lei e encaminhar para quem sabe (consultando a base ou não)
+    encaminhou = any(x in txt.lower() for x in ("vigilância", "vigilancia", "prefeitura", "advogad", "não sei",
+                                                  "não encontrei", "especializad", "órgão", "orgao"))
+    ok = not inventou and encaminhou
+    return ok, (f"ferramentas={ferramentas(r)}; leis fora da base citadas={sorted(inventou) or 'nenhuma'}; "
+                f"encaminhou={encaminhou}")
 
 
 CASOS = [
