@@ -19,7 +19,7 @@
 - **Linguagem:** Python
 - **Interface:** Streamlit
 - **Banco:** SQLite (arquivo local, zero custo)
-- **LLM:** Google Gemini (plano gratuito) com function calling — a equipe não tem créditos AWS
+- **LLM:** function calling, planos gratuitos (a equipe não tem créditos AWS)
 - **LLM principal:** Groq `openai/gpt-oss-120b` (gratuito, rápido, 10/10 na avaliação)
 - **LLM reserva:** Gemini — troca automática se o Groq cair
 - **Repositório:** público, licença MIT (o edital valoriza código aberto)
@@ -60,17 +60,21 @@ Perguntas que a banca tende a fazer (seção 10 do edital): de onde vêm os fato
 - [ ] João Paulo aceitar convite de colaborador (se ainda não aceitou)
 - [ ] Cada um criar sua chave do **Groq** (https://console.groq.com/keys) e do Gemini (https://aistudio.google.com/apikey) e rodar `pip install -r requirements.txt` de novo
 - [ ] Entrevista rápida com comerciante conhecido (Arthur) — registrar respostas em `docs/validacao.md`
+- [ ] Gravar vídeo de backup da demo (ver `docs/DEMO.md`)
 
-## Arquitetura (v0.1)
+## Arquitetura (v1 — congelada em 24/10 00:27)
 ```
-app.py                  → interface Streamlit (João Paulo evolui)
+app.py                  → interface Streamlit: Agente, Dashboard, Estoque, Pedidos, Rastreio
 ciclozero/db.py         → SQLite: produtos, lotes (validade), movimentações, pedidos, log_agente
-ciclozero/tools.py      → 8 ferramentas do agente (os números saem daqui, nunca do LLM)
-ciclozero/agent.py      → loop Gemini + function calling, guardrails, rastreio
-ciclozero/seed.py       → padaria/mercadinho fictício com 30 dias de histórico
-docs/FLUXO_AGENTE.md    → entregável: inputs, lógica, outputs (Arthur revisa)
+ciclozero/tools.py      → 10 ferramentas do agente (os números saem daqui, nunca do LLM)
+ciclozero/agent.py      → loop multi-provedor (Groq → Gemini) + function calling, guardrails, rastreio
+ciclozero/metricas.py   → observabilidade: latência média/p95, erros, uso de reserva
+ciclozero/graficos.py   → gráficos do dashboard (João)
+ciclozero/seed.py       → padaria fictícia com 30 dias de histórico
+tests/eval_agente.py    → avaliação automática (11 casos) → docs/AVALIACAO.md
+docs/                   → DECISOES, TAREFAS, FLUXO_AGENTE, DEMO, AVALIACAO
 ```
-Decisões de projeto: cálculos em Python (não no LLM) para evitar número inventado; FEFO na baixa de estoque; pedido de compra sempre como rascunho com aprovação humana; pedido > 2× o sugerido é bloqueado; desconto máximo 50%; máximo 8 passos por pergunta; modelo configurável por `GEMINI_MODEL` (padrão `gemini-3.8-flash`).
+Decisões de projeto: cálculos em Python (não no LLM) para evitar número inventado; FEFO na baixa de estoque; pedido de compra sempre como rascunho com aprovação humana; pedido > 2× o sugerido é bloqueado e reposição desconta pedidos em aberto; desconto máximo 50%; travas contra "contornar" recusas e contra confundir chegada com saída; máximo 8 passos por pergunta; troca automática de modelo/provedor.
 
 ## Log
 - **2026-10-24 00:35** — Roteiro da demo em `docs/DEMO.md` (≈75 s: Dashboard → entrada por linguagem natural → rotina autônoma → aprovação humana → Rastreio), checklist, plano B, como gravar o vídeo de backup e respostas para perguntas técnicas da banca.
