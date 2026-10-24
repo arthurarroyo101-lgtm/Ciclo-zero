@@ -30,6 +30,8 @@
 > Se sobrar tempo ou na pergunta da banca: **"Exemplo: Laticinios"** mostra um item com confiança baixa ("IOG NAT DANONE") e um aviso de custo acima do cadastro; depois de confirmar, a mesma nota volta com "aprendido" — **a loja ensina o sistema**.
 > Alternativa mais impactante na hora: imprimir `docs/exemplos/nota_exemplo_ceasa.png` e usar **📷 Câmera** para fotografar o papel ao vivo.
 
+- [ ] **Não atualizar pacotes** (`pip install -U`) no dia: o painel animado usa `components.html`, que versões futuras do Streamlit podem remover
+
 ## Plano B
 | Problema | O que fazer |
 |---|---|

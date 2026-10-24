@@ -91,6 +91,16 @@ def criar_tabelas() -> None:
         colunas = {r["name"] for r in conn.execute("PRAGMA table_info(produtos)")}
         if "validade_padrao_dias" not in colunas:
             conn.execute("ALTER TABLE produtos ADD COLUMN validade_padrao_dias INTEGER DEFAULT 7")
+        # bancos migrados com "7 dias para todos": preenche a validade real dos produtos de exemplo
+        from .seed import PRODUTOS
+        nomes = [item[0] for item in PRODUTOS]
+        marca = ",".join("?" * len(nomes))
+        todos_7 = conn.execute(f"SELECT COUNT(*) FROM produtos WHERE nome IN ({marca}) AND validade_padrao_dias=7",
+                               nomes).fetchone()[0]
+        existentes = conn.execute(f"SELECT COUNT(*) FROM produtos WHERE nome IN ({marca})", nomes).fetchone()[0]
+        if existentes and todos_7 == existentes:
+            for item in PRODUTOS:
+                conn.execute("UPDATE produtos SET validade_padrao_dias=? WHERE nome=?", (item[9], item[0]))
         col_ped = {r["name"] for r in conn.execute("PRAGMA table_info(pedidos)")}
         if "aprovado_em" not in col_ped:
             conn.execute("ALTER TABLE pedidos ADD COLUMN aprovado_em TEXT")

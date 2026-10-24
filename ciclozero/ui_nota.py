@@ -84,17 +84,21 @@ def render(obter_agente) -> None:
     with conectar() as conn:
         nomes = [r["nome"] for r in conn.execute("SELECT nome FROM produtos ORDER BY nome")]
     df = pd.DataFrame(st.session_state.nota_linhas)
+    # exibição no padrão brasileiro (a quantidade continua número para poder editar)
+    df["produto"] = df["produto"].fillna("")
+    df["custo_unitario"] = df["custo_unitario"].map(lambda v: "" if v is None or pd.isna(v) else _reais(v))
+    df["confianca"] = (df["confianca"].fillna(0) * 100).round().astype(int)
     editado = st.data_editor(
         df, hide_index=True, width="stretch", key="editor_nota",
         column_config={
             "lancar": st.column_config.CheckboxColumn("Lançar?"),
             "descricao_nota": st.column_config.TextColumn("Na nota", disabled=True),
             "produto": st.column_config.SelectboxColumn("Produto no estoque", options=[""] + nomes),
-            "quantidade": st.column_config.NumberColumn("Qtd", min_value=0.0, step=0.1),
+            "quantidade": st.column_config.NumberColumn("Qtd", min_value=0.0, step=0.1, format="%g"),
             "unidade": st.column_config.TextColumn("Un", disabled=True),
             "validade": st.column_config.TextColumn("Validade (DD/MM/AAAA)"),
-            "custo_unitario": st.column_config.NumberColumn("Custo un.", format="R$ %.2f", disabled=True),
-            "confianca": st.column_config.ProgressColumn("Confiança", min_value=0.0, max_value=1.0, format="%.2f"),
+            "custo_unitario": st.column_config.TextColumn("Custo un.", disabled=True),
+            "confianca": st.column_config.ProgressColumn("Confiança", min_value=0, max_value=100, format="%d%%"),
             "origem": st.column_config.TextColumn("Como associou", disabled=True),
             "avisos": st.column_config.TextColumn("Avisos", disabled=True),
         })
