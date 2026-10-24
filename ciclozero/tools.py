@@ -83,6 +83,11 @@ def _media_vendas_dia(conn, produto_id: int) -> float:
     return round(r["s"] / JANELA_VENDAS_DIAS, 2)
 
 
+def _num(v: float) -> str:
+    """Número no padrão brasileiro com até 2 casas: 106.333 -> '106,33'; 34.0 -> '34'."""
+    return f"{round(v, 2):.2f}".rstrip("0").rstrip(".").replace(".", ",")
+
+
 def _dias_para_vencer(validade: str | None) -> int | None:
     if not validade:
         return None
@@ -352,6 +357,7 @@ def calcular_reposicao() -> dict:
 
     Quantidade sugerida = média de vendas/dia x (prazo de entrega + dias de cobertura) - saldo atual
     - o que já foi pedido, respeitando o estoque mínimo. Produtos com sobra projetada não entram.
+    Cada item traz o campo 'conta' com o cálculo completo: use-o para explicar o número ao usuário.
     """
     with conectar() as conn:
         prods = conn.execute("SELECT * FROM produtos").fetchall()
@@ -365,12 +371,28 @@ def calcular_reposicao() -> dict:
             saldo = _saldo(conn, p["id"])
             pedido = a_caminho.get(p["nome"], 0)
             media = _media_vendas_dia(conn, p["id"])
-            alvo = max(media * (p["prazo_entrega_dias"] + COBERTURA_DIAS), p["estoque_minimo"])
-            precisa = round(alvo - saldo - pedido, 1)
-            if precisa > 0 and (saldo + pedido < p["estoque_minimo"] or saldo + pedido < media * p["prazo_entrega_dias"] * 1.5):
+            prazo = p["prazo_entrega_dias"]
+            pela_venda = media * (prazo + COBERTURA_DIAS)
+            alvo = max(pela_venda, p["estoque_minimo"])
+            bruto = alvo - saldo - pedido
+            # arredonda para cima: unidade sem fração; kg com 1 casa (nunca pede menos que o necessário)
+            precisa = float(math.ceil(bruto - 1e-9)) if p["unidade"] != "kg" else math.ceil(bruto * 10 - 1e-9) / 10
+            if precisa > 0 and (saldo + pedido < p["estoque_minimo"] or saldo + pedido < media * prazo * 1.5):
+                u = p["unidade"]
+                if pela_venda >= p["estoque_minimo"]:
+                    base = (f"média de vendas {_num(media)} {u}/dia × ({prazo} {"dia" if prazo == 1 else "dias"} de entrega + {COBERTURA_DIAS} dias "
+                            f"de cobertura) = {_num(pela_venda)} {u}")
+                else:
+                    base = f"estoque mínimo de {_num(alvo)} {u} (maior que a venda prevista de {_num(pela_venda)} {u})"
+                conta = f"{base} − saldo atual {_num(saldo)} {u}"
+                if pedido:
+                    conta += f" − já pedido {_num(pedido)} {u}"
+                conta += f" = {_num(bruto)} {u}"
+                if precisa != round(bruto, 2):
+                    conta += f" → {_num(precisa)} {u} (arredondado para cima)"
                 item = {"produto": p["nome"], "saldo": saldo, "media_vendas_dia": media,
-                        "quantidade_sugerida": precisa, "unidade": p["unidade"],
-                        "custo_estimado": round(precisa * p["preco_custo"], 2)}
+                        "prazo_entrega_dias": prazo, "quantidade_sugerida": precisa, "unidade": u,
+                        "custo_estimado": round(precisa * p["preco_custo"], 2), "conta": conta}
                 if pedido:
                     item["ja_pedido"] = pedido
                 por_forn.setdefault(p["fornecedor"] or "sem fornecedor", []).append(item)
