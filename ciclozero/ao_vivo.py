@@ -1,7 +1,8 @@
 """Loja "ao vivo": simulador de vendas do caixa + painel que se atualiza sozinho.
 
 Num comércio real, as vendas chegariam do PDV/caixa o dia inteiro. Para a demo, este simulador
-gera vendas realistas (proporcionais à média de cada produto, baixando do lote que vence primeiro,
+gera, em ritmo acelerado, ~80% vendas, ~12% chegadas de mercadoria (repõe o que está acabando) e ~8% perdas
+(algo estraga). As vendas são realistas (proporcionais à média de cada produto, baixando do lote que vence primeiro,
 nunca deixando estoque negativo) usando a MESMA ferramenta do agente (tools.registrar_saida).
 Tudo marcado como simulação (motivo "simulação ao vivo") e desligado por padrão.
 
@@ -14,7 +15,7 @@ import random
 import threading
 import time
 from collections import deque
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from . import tools
 from .db import conectar
@@ -55,7 +56,25 @@ class Simulador:
             self._parar.wait(INTERVALO_S * random.uniform(0.6, 1.4))
 
     def passo(self) -> list[dict]:
-        """Um cliente passa no caixa: 1 a 3 produtos, escolhidos pelo quanto cada um costuma vender."""
+        """Um momento da loja: quase sempre um cliente no caixa; às vezes chega mercadoria ou algo estraga."""
+        sorteio = random.random()
+        if sorteio < 0.12:
+            ev = self._chegada()
+        elif sorteio < 0.20:
+            ev = self._perda()
+        else:
+            return self._venda()
+        return [ev] if ev else self._venda()
+
+    def _registrar(self, tipo: str, nome: str, qtd: float, unidade: str) -> dict:
+        ev = {"hora": datetime.now().strftime("%H:%M:%S"), "tipo": tipo, "produto": nome,
+              "quantidade": qtd, "unidade": unidade}
+        self.eventos.appendleft(ev)
+        self.vendas_sessao += tipo == "venda"
+        return ev
+
+    def _venda(self) -> list[dict]:
+        """Cliente no caixa: 1 a 3 produtos, escolhidos pelo quanto cada um costuma vender."""
         itens = [i for i in tools.consultar_estoque()["itens"] if i["saldo"] > 0 and i["media_vendas_dia"] > 0]
         if not itens:
             return []
@@ -63,21 +82,39 @@ class Simulador:
         escolhidos = {i["produto"]: i for i in random.choices(itens, weights=pesos, k=random.randint(1, 3))}
         vendidos = []
         for nome, item in escolhidos.items():
-            if item["unidade"] == "kg":
-                qtd = round(random.uniform(0.2, 1.5), 1)
-            else:
-                qtd = float(random.randint(1, 3))
+            qtd = round(random.uniform(0.2, 1.5), 1) if item["unidade"] == "kg" else float(random.randint(1, 3))
             qtd = min(qtd, item["saldo"])
-            if qtd <= 0:
-                continue
-            r = tools.registrar_saida(nome, qtd, "venda", MOTIVO)
-            if r.get("ok"):
-                ev = {"hora": datetime.now().strftime("%H:%M:%S"), "produto": nome, "quantidade": qtd,
-                      "unidade": item["unidade"]}
-                self.eventos.appendleft(ev)
-                self.vendas_sessao += 1
-                vendidos.append(ev)
+            if qtd > 0 and tools.registrar_saida(nome, qtd, "venda", MOTIVO).get("ok"):
+                vendidos.append(self._registrar("venda", nome, qtd, item["unidade"]))
         return vendidos
+
+    def _chegada(self) -> dict | None:
+        """Fornecedor entrega um produto que está acabando (validade padrão do produto)."""
+        itens = tools.consultar_estoque()["itens"]
+        faltando = [i for i in itens if i["saldo"] < max(i["estoque_minimo"], i["media_vendas_dia"] * 2)]
+        if not faltando:
+            return None
+        item = random.choice(faltando)
+        with conectar() as conn:
+            dias = conn.execute("SELECT COALESCE(validade_padrao_dias, 7) d FROM produtos WHERE nome=?",
+                                (item["produto"],)).fetchone()["d"]
+        qtd = max(1.0, round(item["media_vendas_dia"] * random.uniform(2, 4), 1 if item["unidade"] == "kg" else 0))
+        validade = (date.today() + timedelta(days=int(dias))).strftime("%d/%m/%Y")
+        if tools.registrar_entrada(item["produto"], qtd, validade).get("ok"):
+            return self._registrar("chegada", item["produto"], qtd, item["unidade"])
+        return None
+
+    def _perda(self) -> dict | None:
+        """Um produto estraga (pequena quantidade do lote que vence primeiro)."""
+        candidatos = [i for i in tools.consultar_estoque()["itens"]
+                      if i["saldo"] > 0 and i["dias_para_vencer"] is not None and i["dias_para_vencer"] <= 3]
+        if not candidatos:
+            return None
+        item = random.choice(candidatos)
+        qtd = min(item["saldo"], round(random.uniform(0.3, 1.2), 1) if item["unidade"] == "kg" else 1.0)
+        if tools.registrar_saida(item["produto"], qtd, "perda", "estragou (" + MOTIVO + ")").get("ok"):
+            return self._registrar("perda", item["produto"], qtd, item["unidade"])
+        return None
 
 
 _SIM = Simulador()  # um por processo do app
@@ -163,9 +200,9 @@ def _cartoes(cartoes: list[dict]) -> None:
     import streamlit.components.v1 as components
     import streamlit as st
     try:  # segue o tema escolhido no Streamlit (claro/escuro); se não der para saber, segue o navegador
-        tema = st.context.theme.type or "auto"
+        tema = st.context.theme.type or "light"
     except Exception:
-        tema = "auto"
+        tema = "light"
     html = _CARTOES_HTML.replace("__DADOS__", _json.dumps(cartoes, ensure_ascii=False)).replace("__TEMA__", tema)
     components.html(html, height=118)
 
@@ -214,8 +251,10 @@ def painel() -> None:
              "para": perdas["total_perdas_rs"], "nota": perdas["perdas_sobre_faturamento"].replace(".", ",") + " do faturamento"},
         ])
         if sim.ativo and sim.eventos:
-            st.caption("🧾 Últimas vendas: " + " · ".join(
-                f"{e['hora']} {e['quantidade']:g} {e['unidade']} {e['produto']}" for e in list(sim.eventos)[:5]))
+            icone = {"venda": "🛒", "chegada": "🚚", "perda": "🗑️"}
+            st.caption("Movimento: " + " · ".join(
+                f"{icone.get(e.get('tipo'), '🛒')} {e['hora']} {e['quantidade']:g} {e['unidade']} {e['produto']}"
+                for e in list(sim.eventos)[:5]) + "  ·  🛒 venda  🚚 chegada  🗑️ estragou")
         st.session_state["_painel_anterior"] = atual
 
     _painel()
@@ -227,7 +266,7 @@ if __name__ == "__main__":
     try:
         while True:
             for ev in s.passo():
-                print(f"{ev['hora']}  venda: {ev['quantidade']:g} {ev['unidade']} {ev['produto']}")
+                print(f"{ev['hora']}  {ev['tipo']}: {ev['quantidade']:g} {ev['unidade']} {ev['produto']}")
             print(f"   hoje: {vendas_de_hoje()}")
             time.sleep(INTERVALO_S)
     except KeyboardInterrupt:
