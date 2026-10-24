@@ -97,9 +97,10 @@ class AgenteCicloZero:
         chave = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         if not chave:
             raise RuntimeError("Defina GEMINI_API_KEY no arquivo .env")
-        self.client = genai.Client(api_key=chave)
+        self.client = genai.Client(api_key=chave, http_options=types.HttpOptions(timeout=60_000))  # 60 s por chamada
         self.modelo = modelo
         self.historico: list[types.Content] = []
+        self.ao_passo = None  # callback opcional para mostrar o progresso (terminal/Streamlit)
         self.sessao = uuid.uuid4().hex[:8]
         self.config = types.GenerateContentConfig(
             system_instruction=INSTRUCOES.format(hoje=date.today().strftime("%d/%m/%Y"),
@@ -115,9 +116,16 @@ class AgenteCicloZero:
             try:
                 return self.client.models.generate_content(model=self.modelo, contents=contents, config=self.config)
             except Exception as e:
-                if tentativa == 2:
+                msg = str(e)
+                # erro de configuração (modelo inexistente, chave inválida): não adianta tentar de novo
+                if tentativa == 2 or any(c in msg for c in ("404", "401", "403", "API key", "INVALID_ARGUMENT")):
                     raise
+                self._avisar(f"⏳ API instável ({msg[:80]}...), tentando de novo")
                 time.sleep(4 * (tentativa + 1))
+
+    def _avisar(self, texto: str) -> None:
+        if self.ao_passo:
+            self.ao_passo(texto)
 
     def perguntar(self, mensagem: str) -> dict:
         """Processa uma mensagem e devolve {'resposta': str, 'passos': [chamadas de ferramenta]}."""
@@ -125,6 +133,7 @@ class AgenteCicloZero:
         _log(self.sessao, 0, "usuario", mensagem)
         self.historico.append(types.Content(role="user", parts=[types.Part(text=mensagem)]))
         for passo in range(1, MAX_PASSOS + 1):
+            self._avisar(f"🧠 passo {passo}: pensando...")
             try:
                 resp = self._gerar(self.historico)
             except Exception as e:
@@ -143,6 +152,7 @@ class AgenteCicloZero:
             partes = []
             for fc in chamadas:
                 args = dict(fc.args or {})
+                self._avisar(f"🔧 {fc.name}({args})")
                 resultado = _datas_br(_executar(fc.name, args))
                 passos.append({"ferramenta": fc.name, "argumentos": args, "resultado": resultado})
                 _log(self.sessao, passo, "ferramenta", {"nome": fc.name, "args": args, "resultado": resultado})
@@ -159,12 +169,12 @@ class AgenteCicloZero:
 
 if __name__ == "__main__":
     agente = AgenteCicloZero()
+    agente.ao_passo = lambda t: print("   " + t, flush=True)
+    print(f"Modelo: {agente.modelo}")
     print("Ciclo Zero — digite 'rotina' para a rotina diária ou 'sair'.")
     while True:
         msg = input("\nVocê: ").strip()
         if msg.lower() in ("sair", "exit"):
             break
         r = agente.rotina_diaria() if msg.lower() == "rotina" else agente.perguntar(msg)
-        for p in r["passos"]:
-            print(f"  🔧 {p['ferramenta']}({p['argumentos']})")
         print("\nCiclo Zero:", r["resposta"])
