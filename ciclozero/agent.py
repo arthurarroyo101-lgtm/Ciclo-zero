@@ -42,6 +42,7 @@ MODELOS_RESERVA = [m.strip() for m in os.getenv(
 NIVEL_RACIOCINIO = os.getenv("GEMINI_THINKING", "low")  # minimal | low | medium | high
 GROQ_MODELS = [m.strip() for m in os.getenv(
     "GROQ_MODELS", "openai/gpt-oss-120b,llama-3.3-70b-versatile").split(",") if m.strip()]
+GROQ_RACIOCINIO = os.getenv("GROQ_REASONING", "low")  # low | medium | high (só modelos gpt-oss)
 MAX_PASSOS = 8
 FERRAMENTAS_QUE_ALTERAM = {"registrar_entrada", "registrar_saida", "criar_pedido_compra"}
 
@@ -61,14 +62,15 @@ Regras:
 Hoje é {hoje} ({dia_semana})."""
 
 ROTINA_DIARIA = (
-    "Execute a rotina diária de abertura da loja, nesta ordem, sem pedir confirmação:\n"
-    "1. Chame analisar_risco_desperdicio(dias=5) e monte o plano de ação por lote (promoção com preço, doação ou descarte).\n"
-    "2. Chame calcular_reposicao().\n"
-    "3. Para CADA fornecedor em 'sugestoes_por_fornecedor', chame criar_pedido_compra com os produtos e as "
-    "quantidades sugeridas (são rascunhos; o dono aprova depois). Se não houver sugestões, diga que não há compras.\n"
-    "4. Termine com um resumo usando EXATAMENTE os campos de 'resumo' da análise: perda total se nada for feito, "
-    "receita recuperada com as promoções, custo dos itens que vão para doação, e a lista de pedidos criados "
-    "(número, fornecedor, valor). Não some nem recalcule valores."
+    "Execute a rotina diária de abertura da loja, sem pedir confirmação, no MENOR número de passos:\n"
+    "Passo A: chame JUNTAS, na mesma resposta, analisar_risco_desperdicio(dias=5) e calcular_reposicao().\n"
+    "Passo B: chame JUNTAS, na mesma resposta, uma criar_pedido_compra para CADA fornecedor em "
+    "'sugestoes_por_fornecedor', com os produtos e as quantidades sugeridas (são rascunhos; o dono aprova depois). "
+    "Se não houver sugestões, pule este passo.\n"
+    "Passo C: responda com (1) o plano de ação por lote em lista curta (produto, ação, preço promocional ou quantidade "
+    "para doar), (2) os pedidos criados (número, fornecedor, valor) e (3) um resumo usando EXATAMENTE os campos de "
+    "'resumo' da análise: perda total se nada for feito, receita recuperada com as promoções e custo dos itens "
+    "doados. Não some nem recalcule valores."
 )
 
 _FERR_POR_NOME = {f.__name__: f for f in FERRAMENTAS}
@@ -89,6 +91,21 @@ def _datas_br(obj):
         return [_datas_br(v) for v in obj]
     if isinstance(obj, str) and _ISO.match(obj):
         return data_br(obj)
+    return obj
+
+
+_CAMPOS_SO_TELA = {"lote", "media_vendas_dia", "abaixo_do_custo", "lotes_consumidos", "estoque_minimo", "categoria"}
+
+
+def _enxuto(obj):
+    """Versão compacta do resultado para o modelo: menos tokens = resposta mais rápida."""
+    if isinstance(obj, dict):
+        return {k: _enxuto(v) for k, v in obj.items()
+                if k not in _CAMPOS_SO_TELA and v is not None and v is not False and v != []}
+    if isinstance(obj, list):
+        return [_enxuto(v) for v in obj]
+    if isinstance(obj, float):
+        return round(obj, 2)
     return obj
 
 
@@ -233,8 +250,9 @@ class _Groq:
         for modelo in candidatos:
             for tentativa in range(2 if modelo == self.modelo else 1):
                 try:
+                    extra = {"reasoning_effort": GROQ_RACIOCINIO} if "gpt-oss" in modelo and GROQ_RACIOCINIO else {}
                     resp = self.client.chat.completions.create(model=modelo, messages=messages, tools=self.tools,
-                                                               tool_choice="auto", temperature=0.2)
+                                                               tool_choice="auto", temperature=0.2, **extra)
                     if modelo != self.modelo:
                         self.avisar(f"🔁 Groq: usando {modelo}")
                         self.modelo = modelo
@@ -271,7 +289,7 @@ class _Groq:
                 else:
                     resultado = chamar(tc.function.name, args, passo)
                 messages.append({"role": "tool", "tool_call_id": tc.id,
-                                 "content": json.dumps(resultado, ensure_ascii=False, default=str)})
+                                 "content": json.dumps(resultado, ensure_ascii=False, default=str, separators=(",", ":"))})
         return None
 
 
@@ -317,7 +335,7 @@ class AgenteCicloZero:
             resultado = _datas_br(_executar(nome, args))
             passos.append({"ferramenta": nome, "argumentos": args, "resultado": resultado})
             _log(self.sessao, passo, "ferramenta", {"nome": nome, "args": args, "resultado": resultado})
-            return resultado
+            return _enxuto(resultado)
 
         erro = ""
         for i, prov in enumerate(self.provedores):
