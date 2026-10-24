@@ -32,6 +32,12 @@ def tabela(linhas):
     return df
 
 
+def marcar_risco(col, ativo: bool = True) -> None:
+    """Pinta de vermelho (#C8402B) o st.metric desta coluna: valor negativo ou de risco."""
+    if ativo:
+        col.markdown("<span class='cz-neg'></span>", unsafe_allow_html=True)
+
+
 def reais(v: float) -> str:
     txt = f"R$ {abs(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     return ("−" + txt) if v < 0 else txt
@@ -83,15 +89,16 @@ with aba_nota:  # módulo separado (Matheus) para não conflitar com o resto da 
 
 with aba_chat:
     if not (tem_env or chave):
-        st.info("Informe a chave do Gemini na barra lateral (ou no arquivo .env) para conversar com o agente.")
+        st.info("Para conversar com o agente, coloque a chave do Gemini na barra lateral ou no arquivo .env.")
     else:
         agente = get_agente(chave)
         st.session_state.setdefault("chat", [])
-        if st.button("▶️ Rodar rotina diária (modo autônomo)", type="primary"):
-            with st.status("O agente está trabalhando...", expanded=True) as status:
+        if st.button("▶️ Rodar rotina diária", type="primary",
+                     help="O agente confere o que vence, monta o plano de cada lote e prepara os pedidos de compra."):
+            with st.status("Conferindo a loja...", expanded=True) as status:
                 agente.ao_passo = lambda t: status.write(ui_agente.passo_amigavel(t))
                 r = agente.rotina_diaria()
-                status.update(label="Rotina concluída", state="complete", expanded=False)
+                status.update(label="Plano de hoje pronto", state="complete", expanded=False)
             r["rotina"] = True
             st.session_state.chat.append(("user", "▶️ Rotina diária"))
             st.session_state.chat.append(("assistant", r))
@@ -104,24 +111,24 @@ with aba_chat:
                 if conteudo.get("rotina") and ui_agente.tem_plano(passos) and not conteudo.get("erro_sistema"):
                     # rotina: cartões primeiro (números das ferramentas), texto do agente logo abaixo
                     ui_agente.render_plano(passos)
-                    with st.expander("💬 Resumo escrito pelo agente", expanded=False):
+                    with st.expander("Resumo escrito pelo agente", expanded=False):
                         st.markdown(conteudo["resposta"])
                 else:
                     st.markdown(conteudo["resposta"])
                     if ui_agente.tem_plano(passos) and not conteudo.get("erro_sistema"):
                         ui_agente.render_plano(passos)
                 if passos and tecnico:
-                    with st.expander(f"🔧 Como o agente chegou nisso ({len(passos)} ferramenta(s))"):
+                    with st.expander(f"Como o agente chegou nisso ({len(passos)} ferramenta(s))"):
                         for i, p in enumerate(passos, 1):
-                            st.markdown(f"**{i}. {ui_agente.nome_amigavel(p['ferramenta'])}** · "
+                            st.markdown(f"**{i}. {ui_agente.nome_amigavel(p['ferramenta'])}**  \n"
                                         f"`{p['ferramenta']}({p['argumentos']})`")
                             st.json(p["resultado"], expanded=False)
-        st.markdown("<div class='cz-pergunta'>💬 Qual a dúvida de hoje?</div>", unsafe_allow_html=True)
+        st.markdown("<div class='cz-pergunta'>Qual a dúvida de hoje?</div>", unsafe_allow_html=True)
         st.caption("Pode perguntar do seu jeito, por exemplo: “chegaram 30 litros de leite com validade "
                    "30/10/2026”, “o que vence essa semana?” ou “quanto devo pedir de leite?”")
         if msg := st.chat_input("Qual a dúvida de hoje?"):
             st.session_state.chat.append(("user", msg))
-            with st.status("O agente está trabalhando...", expanded=True) as status:
+            with st.status("Pensando...", expanded=True) as status:
                 agente.ao_passo = lambda t: status.write(ui_agente.passo_amigavel(t))
                 st.session_state.chat.append(("assistant", agente.perguntar(msg)))
                 status.update(label="Pronto", state="complete", expanded=False)
@@ -133,34 +140,38 @@ with aba_dash:
         risco = tools.analisar_risco_desperdicio()
         perdas = tools.relatorio_desperdicio(30)
         fin = ao_vivo.financeiro_do_dia()
-        with st.container(border=True):
-            st.markdown("#### 💰 Hoje" + ("  ·  🟢 ao vivo" if ao_vivo.simulador().ativo else ""))
+        with st.container():
+            st.markdown("#### Como está o dia" + (" (ao vivo)" if ao_vivo.simulador().ativo else ""))
             esc = lambda v: reais(v).replace("$", "\\$")
             f1, f2, f3 = st.columns(3)
             f1.metric("Vendas", reais(fin["vendas_rs"]), f"{fin['n_vendas']} vendas", delta_color="off",
                       help=f"Ticket médio {reais(fin['ticket_medio_rs'])}")
+            marcar_risco(f2, fin["caixa_rs"] < 0)
             f2.metric("Caixa", reais(fin["caixa_rs"]),
                       help=f"Vendas − compras recebidas ({reais(fin['compras_rs'])}) − despesas "
                            f"({reais(fin['despesas_rs'])}). Pode fechar negativo em dia de muita compra.")
+            marcar_risco(f3, fin["lucro_rs"] < 0)
             f3.metric("Lucro", reais(fin["lucro_rs"]), f"margem {fin['margem']:.0%}", delta_color="off",
                       help="Vendas − custo do que foi vendido − perdas − despesas. Compra não é prejuízo: vira estoque.")
             f4, f5, f6 = st.columns(3)
-            f4.metric("🚨 Comprado em excesso", reais(fin["excesso_rs"]),
-                      f"{fin['n_excessos']} compra(s) acima do que vende" if fin["n_excessos"] else None,
+            marcar_risco(f4, fin["excesso_rs"] > 0)
+            f4.metric("Comprado a mais", reais(fin["excesso_rs"]),
+                      f"{fin['n_excessos']} compra(s) acima do que você vende" if fin["n_excessos"] else None,
                       delta_color="off",
-                      help="Custo do que entrou além do que a loja consegue vender antes de vencer: vai virar lixo.")
+                      help="O que entrou além do que a loja consegue vender antes de vencer. Se nada for feito, vira lixo.")
             f5.metric("A pagar a fornecedores", reais(fin["a_pagar_rs"]),
                       f"{fin['a_pagar_n']} pedido(s) aprovado(s)" if fin["a_pagar_n"] else None, delta_color="off",
                       help="Pedidos aprovados que ainda não chegaram. Quando chegam, entram no estoque e saem do caixa.")
-            f6.metric("Pedidos p/ aprovar", fin["pedidos_pendentes"],
+            f6.metric("Pedidos para aprovar", fin["pedidos_pendentes"],
                       esc(fin["pedidos_pendentes_rs"]) if fin["pedidos_pendentes"] else None, delta_color="off")
             ao_vivo.render_alertas_excesso(maximo=2)
             if tecnico:
-                st.caption("Caixa = vendas − (compras/produção + despesas) · Lucro = vendas − custo do vendido − perdas − "
-                           "despesas · Excesso = custo do que entrou além do que a loja vende antes de vencer.")
+                st.caption("Caixa: vendas menos compras, produção e despesas. Lucro: vendas menos o custo do que foi "
+                           "vendido, as perdas e as despesas. Comprado a mais: custo do que entrou além do que a loja "
+                           "vende antes de vencer.")
                 mov = ao_vivo.tabela_movimento()
                 if not mov.empty:
-                    st.markdown("##### Últimos lançamentos (modo técnico)")
+                    st.markdown("##### Últimos lançamentos")
                     st.dataframe(mov, width="stretch", hide_index=True, height=250)
         from ciclozero import graficos
 
@@ -175,40 +186,41 @@ with aba_dash:
                        "Perdas e risco são medidos pelo custo do produto.")
 
         col_a, col_b = st.columns(2)
-        with col_a, st.container(border=True):
-            st.markdown("#### ⏳ O que precisa de ação agora")
+        with col_a:
+            st.markdown("#### O que precisa de ação agora")
             if df_lotes.empty:
-                st.success("Nenhum lote vence nos próximos 5 dias com sobra prevista.")
+                st.success("Nada vai vencer na prateleira nos próximos 5 dias.")
             else:
-                st.caption(f"{len(df_lotes)} lote(s) vencem em até 5 dias e não devem ser vendidos a tempo. "
-                           f"Sem ação, a perda seria de **{graficos.reais(df_lotes['perda'].sum())}**.")
+                st.caption(f"{len(df_lotes)} lote(s) vencem em até 5 dias e não vai dar tempo de vender tudo. "
+                           f"Se nada for feito, você perde **{graficos.reais(df_lotes['perda'].sum())}**.")
                 st.altair_chart(graficos.grafico_lotes_em_risco(df_lotes), width="stretch")
-        with col_b, st.container(border=True):
-            st.markdown("#### 🏆 Top 5 produtos que mais geram desperdício")
+        with col_b:
+            st.markdown("#### Os 5 produtos que você mais joga fora")
             if df_top.empty:
-                st.info("Sem perdas registradas nos últimos 30 dias.")
+                st.info("Nenhuma perda registrada nos últimos 30 dias.")
             else:
                 lider = df_top.iloc[0]
                 st.caption(f"**{lider['produto']}** sozinho responde por {lider['parcela']} "
                            f"({lider['valor_fmt']} em 30 dias).")
                 st.altair_chart(graficos.grafico_top_desperdicio(df_top), width="stretch")
 
-        with st.container(border=True):
-            st.markdown("#### 📈 Vendas × perdas por dia (últimos 30 dias)")
+        with st.container():
+            st.markdown("#### Vendas e perdas, dia a dia (últimos 30 dias)")
             if df_dia.empty:
                 st.info("Sem movimentações no período.")
             else:
-                st.caption(f"Faturamento de {graficos.reais(perdas['faturamento_rs'])} e perdas de "
-                           f"{graficos.reais(perdas['total_perdas_rs'])} ({perdas['perdas_sobre_faturamento']} do "
-                           "faturamento). Cada eixo tem sua escala para as perdas não sumirem no gráfico.")
+                st.caption(f"Você vendeu {graficos.reais(perdas['faturamento_rs'])} e perdeu "
+                           f"{graficos.reais(perdas['total_perdas_rs'])}, o equivalente a "
+                           f"{perdas['perdas_sobre_faturamento']} do que vendeu."
+                           + (" Cada linha tem sua própria escala, para as perdas não sumirem no gráfico." if tecnico else ""))
                 st.altair_chart(graficos.grafico_vendas_x_perdas(df_dia), width="stretch")
 
-        with st.container(border=True):
-            st.markdown("#### 🗂️ Perdas por categoria")
+        with st.container():
+            st.markdown("#### Onde está a perda, por categoria")
             if df_cat.empty:
-                st.info("Sem perdas registradas nos últimos 30 dias.")
+                st.info("Nenhuma perda registrada nos últimos 30 dias.")
             else:
-                st.caption(f"**{df_cat.iloc[0]['categoria']}** é a categoria que mais perde "
+                st.caption(f"**{df_cat.iloc[0]['categoria']}** é onde você mais perde "
                            f"({df_cat.iloc[0]['valor_fmt']} em 30 dias).")
                 st.altair_chart(graficos.grafico_perdas_por_categoria(df_cat), width="stretch")
     _aba_dash()
@@ -218,10 +230,10 @@ with aba_painel:
     def _aba_estoque():
         risco = tools.analisar_risco_desperdicio()
         perdas = tools.relatorio_desperdicio(30)
-        st.subheader("Lotes em risco de desperdício")
+        st.subheader("Perto de vencer, sem tempo de vender tudo")
         if risco["lotes_em_risco"]:
             st.dataframe(tabela(risco["lotes_em_risco"]), width="stretch", hide_index=True)
-        st.subheader("Estoque atual")
+        st.subheader("Tudo o que tem na loja")
         st.dataframe(tabela(tools.consultar_estoque()["itens"]), width="stretch", hide_index=True)
     _aba_estoque()
 
@@ -232,27 +244,29 @@ with aba_pedidos:
         perdas = tools.relatorio_desperdicio(30)
         pedidos = tools.listar_pedidos()
         if not pedidos:
-            st.info("Nenhum pedido ainda. Rode a rotina diária ou peça ao agente para calcular a reposição.")
-        rotulo = {"rascunho": "📝 aguardando sua aprovação", "aprovado": "✅ aprovado · aguardando entrega",
-                  "recebido": "📦 recebido", "recusado": "❌ recusado"}
+            st.info("Nenhum pedido por enquanto. Rode a rotina diária ou pergunte ao agente o que precisa comprar.")
+        rotulo = {"rascunho": "Esperando sua aprovação", "aprovado": "Aprovado, esperando a entrega",
+                  "recebido": "Recebido", "recusado": "Recusado"}
         for p in pedidos:
             estado = "recebido" if p.get("recebido_em") else p["status"]
             with st.container(border=True):
-                st.markdown(f"**#{p['id']} · {p['fornecedor']}** · {reais(p['valor_estimado'])} · {rotulo.get(estado, estado)}")
-                st.caption(" · ".join(f"{i['produto']}: {i['quantidade']:g} {i.get('unidade', '')}" for i in p["itens"]))
+                st.markdown(f"**{p['fornecedor']}**, pedido {p['id']}: **{reais(p['valor_estimado'])}**  \n"
+                            f"{rotulo.get(estado, estado)}")
+                st.caption("; ".join(f"{i['produto']}, {i['quantidade']:g} {i.get('unidade', '')}".rstrip()
+                                     for i in p["itens"]))
                 if tecnico and p.get("justificativa"):
                     st.caption(p["justificativa"])
                 if estado == "rascunho":
                     a, b = st.columns(2)
-                    if a.button("✅ Aprovar", key=f"ok{p['id']}"):
+                    if a.button("✅ Aprovar pedido", key=f"ok{p['id']}", type="primary"):
                         tools.decidir_pedido(p["id"], True)
                         st.rerun()
-                    if b.button("❌ Recusar", key=f"no{p['id']}"):
+                    if b.button("Recusar", key=f"no{p['id']}"):
                         tools.decidir_pedido(p["id"], False)
                         st.rerun()
                 elif estado == "aprovado":
                     if st.button("📦 Marcar como recebido", key=f"rec{p['id']}",
-                                 help="A mercadoria chegou: entra no estoque e o valor sai do caixa."):
+                                 help="A mercadoria chegou. Ela entra no estoque e o valor sai do caixa."):
                         tools.receber_pedido(p["id"])
                         st.rerun()
     _aba_pedidos()
@@ -273,8 +287,8 @@ with aba_log:
         k3.metric("Tempo p95", f"{m['latencia_p95_pergunta_s']:.1f} s".replace(".", ","))
         k4.metric("Erro do modelo", m["taxa_erro_llm"])
         k5.metric("Usou reserva", m["trocas_para_reserva"])
-        st.caption(f"{m['chamadas_ferramenta']} chamadas de ferramenta · {m['erros_de_ferramenta']} devolveram erro "
-                   f"(e o agente se corrigiu ou perguntou) · {m['perguntas_com_erro']} perguntas sem resposta")
+        st.caption(f"{m['chamadas_ferramenta']} chamadas de ferramenta, {m['erros_de_ferramenta']} com erro (o agente "
+                   f"se corrigiu ou perguntou) e {m['perguntas_com_erro']} pergunta(s) sem resposta.")
         if m["por_modelo"]:
             st.dataframe(pd.DataFrame(m["por_modelo"]), width="stretch", hide_index=True)
         st.subheader("Registro passo a passo")

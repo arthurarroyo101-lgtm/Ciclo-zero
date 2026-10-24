@@ -144,6 +144,7 @@ def render_plano(passos: list[dict]) -> None:
     if risco:
         r = risco.get("resumo", {})
         k1, k2, k3 = st.columns(3)
+        k1.markdown("<span class='cz-neg'></span>", unsafe_allow_html=True)  # risco em vermelho
         k1.metric("Perda se nada for feito", reais(r.get("perda_total_sem_acao_rs", 0)))
         k2.metric("Recuperado com promoções", reais(r.get("receita_recuperada_com_promocoes_rs", 0)))
         k3.metric("Vai para doação, a preço de custo", reais(r.get("custo_dos_itens_para_doacao_rs", 0)))
