@@ -302,4 +302,6 @@ def mensagem_para_agente(dados: dict, resultado: dict) -> str:
     itens = ", ".join(f"{l['quantidade']} {l.get('produto')}" for l in resultado["lancados"])
     return (f"Recebi a nota {dados.get('numero') or ''} do fornecedor {dados.get('fornecedor') or 'não identificado'} "
             f"e os lotes já foram registrados: {itens}. Sem registrar mais nada, analise o risco de desperdício dos "
-            f"próximos 5 dias e diga em até 4 linhas se algum desses produtos vai sobrar e o que fazer.")
+            f"próximos 5 dias e diga em até 4 linhas, agrupando por produto (um produto por linha), quais desses "
+            f"produtos vão sobrar: quantidade que deve sobrar, valor em R$ que vai para o lixo se nada for feito "
+            f"e a ação recomendada (com o preço promocional, se houver). Use só os números da ferramenta.")
