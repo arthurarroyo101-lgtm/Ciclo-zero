@@ -23,5 +23,6 @@
 | Quem paga e quanto? | O dono da loja; assinatura mensal acessível (faixa a validar no piloto). O teste grátis mostra a economia em R$ antes da cobrança. |
 | Qual o tamanho do mercado? | Padarias, mercadinhos e hortifrútis de bairro sem sistema — o público que hoje usa caderno ou planilha. (Arthur: se tiver número com fonte, colocar aqui.) |
 | E a concorrência (ERPs)? | ERPs são feitos para redes: caros e complexos. Nós somos um "funcionário de estoque" que conversa em português e começa com uma foto. |
+| E para redes maiores? | **Roadmap:** integração com PDV/ERP (vendas em tempo real, como simulamos na demo), pedidos automáticos aos fornecedores e visão consolidada de várias lojas. |
 | Como escala? | Software sem instalação, custo de IA baixo por loja, onboarding guiado; canais com Sebrae/associações. |
 | Impacto social? | Doação como ação padrão para o que não vai vender: comida que iria para o lixo vai para bancos de alimentos. |

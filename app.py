@@ -47,22 +47,22 @@ with st.sidebar:
     st.caption("Agente de IA contra o desperdício de alimentos no pequeno comércio")
     tem_env = bool(os.getenv("GEMINI_API_KEY") or os.getenv("GROQ_API_KEY"))
     chave = "" if tem_env else st.text_input("Chave do Gemini", type="password")
+    from ciclozero import ao_vivo as _ao_vivo
+    _ao_vivo.controles()
     if st.button("🔄 Recriar dados de exemplo"):
         from ciclozero.seed import popular
+        _ao_vivo.simulador().parar()  # não escrever no banco enquanto ele é recriado
         popular()
         st.cache_resource.clear()
         st.session_state.pop("chat", None)
         st.rerun()
 
+# indicadores do topo: atualizam sozinhos quando a "Loja ao vivo" está ligada (ciclozero/ao_vivo.py)
+from ciclozero import ao_vivo
+ao_vivo.painel()
 risco = tools.analisar_risco_desperdicio()
 vencendo = tools.listar_produtos_vencendo(3)
 perdas = tools.relatorio_desperdicio(30)
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Lotes em risco (5 dias)", len(risco["lotes_em_risco"]))
-c2.metric("R$ em risco (3 dias)", reais(vencendo["valor_total_em_risco"]))
-c3.metric("Perda projetada sem ação", reais(risco["resumo"]["perda_total_sem_acao_rs"]))
-c4.metric("Perdas últimos 30 dias", reais(perdas["total_perdas_rs"]), perdas["perdas_sobre_faturamento"] + " do faturamento",
-          delta_color="off")
 
 aba_chat, aba_nota, aba_dash, aba_painel, aba_pedidos, aba_log = st.tabs(
     ["💬 Agente", "📷 Nota fiscal", "📊 Dashboard", "📦 Estoque", "🧾 Pedidos", "🔍 Rastreio"])

@@ -72,6 +72,7 @@ ciclozero/metricas.py   → observabilidade: latência média/p95, erros, uso de
 ciclozero/graficos.py   → gráficos do dashboard (João)
 ciclozero/nota_fiscal.py → leitura multimodal da nota fiscal (visão) + verificação + conciliação
 ciclozero/ui_nota.py    → aba 📷 Nota fiscal
+ciclozero/ao_vivo.py    → simulador de vendas do caixa + painel em tempo real
 ciclozero/seed.py       → padaria fictícia com 30 dias de histórico
 tests/eval_agente.py    → avaliação automática (12 casos) → docs/AVALIACAO.md
 docs/                   → DECISOES, TAREFAS, FLUXO_AGENTE, DEMO, AVALIACAO
@@ -79,6 +80,7 @@ docs/                   → DECISOES, TAREFAS, FLUXO_AGENTE, DEMO, AVALIACAO
 Decisões de projeto: cálculos em Python (não no LLM) para evitar número inventado; FEFO na baixa de estoque; pedido de compra sempre como rascunho com aprovação humana; pedido > 2× o sugerido é bloqueado e reposição desconta pedidos em aberto; desconto máximo 50%; travas contra "contornar" recusas e contra confundir chegada com saída; máximo 8 passos por pergunta; troca automática de modelo/provedor.
 
 ## Log
+- **2026-10-24 02:25** — **Loja ao vivo (simulação):** `ciclozero/ao_vivo.py` gera vendas realistas a cada ~4 s (pesos pela média de vendas, FEFO, nunca estoque negativo, mesma ferramenta do agente, motivo "simulação ao vivo"); painel do topo vira fragmento que se atualiza a cada 3 s com setas de variação (Vendas hoje, lotes em risco, R$ em risco, perda projetada) e letreiro das últimas vendas. Desligado por padrão (botão na barra lateral), rotulado como simulação. Conexão SQLite com timeout para escrita concorrente. Pedidos automáticos para grandes redes ficam como **roadmap** do pitch. Requer Streamlit ≥ 1.37.
 - **2026-10-24 02:15** — ✅ **Avaliação v6: 12/12 casos** — e todos rodaram nos **modelos reserva** (`gpt-oss-20b`/`qwen3.8-27b`) porque o principal estava no limite por minuto: prova de resiliência. Fidelidade 98% investigada: não era número inventado — o modelo escreveu "R$ 1 284,80" (espaço como milhar) e o teste leu "R$ 1". Correções: resposta padronizada para R$ 1.284,80; teste entende espaço como milhar; `relatorio_desperdicio` agora informa a unidade (o modelo tinha chutado "48,5 un" para pão francês, que é kg). Números do pitch/demo atualizados para 12/12.
 - **2026-10-24 02:05** — `llama-3.3-70b-versatile` foi descontinuado no Groq (404) e a conta não tem Llama 4 (visão). Reserva do Groq trocada para `gpt-oss-20b` e `qwen/qwen3.8-27b` (modelos listados na conta). Leitura de nota fiscal depende do **Gemini** (Groq/Qwen como última tentativa). Falhas intermitentes do Groq à noite = limite por minuto do plano gratuito; avaliação deve rodar com `PROVEDORES=groq EVAL_PAUSA=15`. Teste agora mostra as esperas (⏳).
 - **2026-10-24 02:10** — Rascunhos de `docs/BMC.md` e `docs/PITCH.md` (para o Arthur revisar), com dados públicos com fonte (ABRAS 2020: perdas 1,79% do faturamento; FLV 5,25%; padaria 2,74%) e hipóteses marcadas. Pitch abre com a dor **validada** (controle manual de estoque) em vez de desperdício. Teste offline da nota: 8/8 no computador do Matheus.

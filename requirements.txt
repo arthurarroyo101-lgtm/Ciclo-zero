@@ -1,5 +1,5 @@
 google-genai>=1.0
-streamlit>=1.36
+streamlit>=1.37
 pandas
 python-dotenv
 openai>=1.40

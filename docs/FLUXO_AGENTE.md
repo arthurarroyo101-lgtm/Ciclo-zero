@@ -20,6 +20,7 @@
 | Entrada | Exemplo |
 |---|---|
 | **Foto da nota fiscal** (multimodal) | Foto/print da nota do fornecedor → visão computacional extrai os itens → lotes entram no estoque após conferência |
+| Vendas do caixa (tempo real) | Na demo, `ciclozero/ao_vivo.py` simula o caixa: vendas proporcionais à média de cada produto, baixando do lote que vence primeiro. Numa loja real, viriam da integração com o PDV. |
 | Mensagem do usuário | "Vendi 5 kg de pão", "o que vai vencer essa semana?", "faz o pedido da Ceasa" |
 | Rotina diária (modo autônomo) | Botão "Rodar rotina diária" — o agente checa tudo sozinho, sem pergunta |
 | Base de dados | Produtos, lotes com validade, 30 dias de vendas e perdas, fornecedores e prazos de entrega |
