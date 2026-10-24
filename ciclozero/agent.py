@@ -117,9 +117,22 @@ _CAMPOS_SO_TELA = {"lote", "media_vendas_dia", "abaixo_do_custo", "lotes_consumi
 _CITACAO = re.compile(r"\s*【[^】]*】")
 
 
+_MILHAR_ESPACO = re.compile(r"(R\$\s?\d{1,3})(?:[ \u00a0\u202f](\d{3}))+(,\d{2})")
+
+
+def _padronizar_reais(texto: str) -> str:
+    """'R$ 1 284,80' (alguns modelos usam espaço como milhar) -> 'R$ 1.284,80'."""
+    def troca(m):
+        bruto = m.group(0)
+        prefixo, resto = bruto[:2], bruto[2:].strip()
+        digitos = re.sub(r"[ \u00a0\u202f]", ".", resto.split(",")[0])
+        return f"{prefixo} {digitos},{resto.split(',')[1]}"
+    return _MILHAR_ESPACO.sub(troca, texto)
+
+
 def _limpar_resposta(texto: str) -> str:
-    """Remove marcas de citação internas que alguns modelos inserem (ex.: 【calcular_reposicao】)."""
-    return _CITACAO.sub("", texto or "").strip()
+    """Remove marcas de citação internas (ex.: 【calcular_reposicao】) e padroniza valores em R$."""
+    return _padronizar_reais(_CITACAO.sub("", texto or "").strip())
 
 
 def _enxuto(obj):

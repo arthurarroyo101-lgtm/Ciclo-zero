@@ -478,15 +478,17 @@ def relatorio_desperdicio(dias: int = 30) -> dict:
     inicio = (_hoje() - timedelta(days=int(dias))).isoformat()
     with conectar() as conn:
         rows = conn.execute(
-            """SELECT p.nome, m.tipo, SUM(m.quantidade) q, SUM(m.valor) v
+            """SELECT p.nome, p.unidade, m.tipo, SUM(m.quantidade) q, SUM(m.valor) v
                FROM movimentacoes m JOIN produtos p ON p.id=m.produto_id
-               WHERE m.tipo IN ('perda','doacao') AND m.data>=? GROUP BY p.nome, m.tipo ORDER BY v DESC""",
+               WHERE m.tipo IN ('perda','doacao') AND m.data>=? GROUP BY p.nome, p.unidade, m.tipo ORDER BY v DESC""",
             (inicio,),
         ).fetchall()
         vendas = conn.execute("SELECT COALESCE(SUM(valor),0) v FROM movimentacoes WHERE tipo='venda' AND data>=?",
                               (inicio,)).fetchone()["v"]
-    perdas = [dict(produto=r["nome"], quantidade=r["q"], valor_rs=round(r["v"], 2)) for r in rows if r["tipo"] == "perda"]
-    doacoes = [dict(produto=r["nome"], quantidade=r["q"], valor_rs=round(r["v"], 2)) for r in rows if r["tipo"] == "doacao"]
+    perdas = [dict(produto=r["nome"], quantidade=r["q"], unidade=r["unidade"], valor_rs=round(r["v"], 2))
+              for r in rows if r["tipo"] == "perda"]
+    doacoes = [dict(produto=r["nome"], quantidade=r["q"], unidade=r["unidade"], valor_rs=round(r["v"], 2))
+               for r in rows if r["tipo"] == "doacao"]
     total_perdas = round(sum(p["valor_rs"] for p in perdas), 2)
     return {"periodo_dias": dias, "perdas": perdas, "doacoes": doacoes, "total_perdas_rs": total_perdas,
             "total_doado_rs": round(sum(d["valor_rs"] for d in doacoes), 2), "faturamento_rs": round(vendas, 2),

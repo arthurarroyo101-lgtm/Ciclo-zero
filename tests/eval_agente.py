@@ -59,7 +59,8 @@ def _numeros(obj, acc):
 
 def reais_na_resposta(texto):
     vals = []
-    for m in re.findall(r"R\$\s?(-?[\d\.]*\d,\d{2}|-?\d+(?:\.\d{2})?)", texto or ""):
+    texto = re.sub(r"(?<=\d)[ \u00a0\u202f](?=\d{3}\b)", ".", texto or "")  # "1 284,80" -> "1.284,80"
+    for m in re.findall(r"R\$\s?(-?[\d\.]*\d,\d{2}|-?\d+(?:\.\d{2})?)", texto):
         vals.append(float(m.replace(".", "").replace(",", ".")) if "," in m else float(m))
     return vals
 

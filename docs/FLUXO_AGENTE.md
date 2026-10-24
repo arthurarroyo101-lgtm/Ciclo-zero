@@ -87,7 +87,7 @@ O painel "Saúde do agente" mostra tempo médio e **p95**, taxa de erro do model
 
 **Como investigamos uma resposta ruim:** abrimos o Rastreio, achamos a sessão, vemos exatamente quais dados as ferramentas devolveram e o que o modelo respondeu. Se o número estava certo na ferramenta e errado na resposta, é problema de instrução (ajustamos o prompt e rodamos `tests/eval_agente.py`); se estava errado na ferramenta, é bug de código.
 
-**Sinais de degradação:** p95 subindo, taxa de erro do modelo subindo, mais trocas para reserva, mais erros de ferramenta por pergunta. Antes de qualquer mudança, rodamos a avaliação automática (11 casos) para garantir que nada piorou.
+**Sinais de degradação:** p95 subindo, taxa de erro do modelo subindo, mais trocas para reserva, mais erros de ferramenta por pergunta. Antes de qualquer mudança, rodamos a avaliação automática (12 casos) para garantir que nada piorou.
 
 ## Por que um agente só (e não vários)?
 O fluxo do pequeno comércio é **sequencial e de um domínio só** (estoque → risco → ação → compra). Dividir em vários agentes (ex.: "agente de validade" + "agente de compras" + "coordenador") traria:
