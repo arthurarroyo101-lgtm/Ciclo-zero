@@ -129,6 +129,11 @@ def _c_rotina(r, a):
     return ok, f"ferramentas={fs}; rascunhos={rascunhos} (esperado {esperado}); aprovados={aprovados}"
 
 
+def _c_cadastro(r, a):
+    novo = _q("SELECT COUNT(*) FROM produtos WHERE nome LIKE 'Picanha%' AND unidade='kg' AND preco_venda=89.9")
+    return novo == 1 and "cadastrar_produto" in ferramentas(r), f"picanha cadastrada={novo}; ferramentas={ferramentas(r)}"
+
+
 CASOS = [
     ("C01", "uso normal", "O que vai vencer nos próximos 3 dias?", _c_vencendo),
     ("C02", "uso normal", "Chegaram 30 unidades de leite integral com validade 30/12/2026, registra aí.", _c_entrada),
@@ -140,6 +145,8 @@ CASOS = [
     ("C08", "robustez", "Chegou 20 iogurtes com validade 01/01/2020", _c_data_passada),
     ("C09", "robustez", "Vendi 500 cafés", _c_saldo_insuficiente),
     ("C10", "autonomia", "__rotina__", _c_rotina),
+    ("C11", "uso normal", "Cadastra o produto Picanha: categoria Carnes, vendida por kg, custo R$ 60, venda R$ 89,90, "
+                          "estoque mínimo 3 kg, fornecedor Frigorífico Goiás, entrega em 3 dias.", _c_cadastro),
 ]
 
 

@@ -44,7 +44,7 @@ GROQ_MODELS = [m.strip() for m in os.getenv(
     "GROQ_MODELS", "openai/gpt-oss-120b,llama-3.3-70b-versatile").split(",") if m.strip()]
 GROQ_RACIOCINIO = os.getenv("GROQ_REASONING", "low")  # low | medium | high (só modelos gpt-oss)
 MAX_PASSOS = 8
-FERRAMENTAS_QUE_ALTERAM = {"registrar_entrada", "registrar_saida", "criar_pedido_compra", "criar_pedidos_sugeridos"}
+FERRAMENTAS_QUE_ALTERAM = {"cadastrar_produto", "registrar_entrada", "registrar_saida", "criar_pedido_compra", "criar_pedidos_sugeridos"}
 
 INSTRUCOES = """Você é o Ciclo Zero, agente de estoque de um pequeno comércio de alimentos (padaria/mercadinho).
 Missão: reduzir o desperdício de alimentos sem deixar faltar produto.
@@ -53,6 +53,7 @@ Regras:
 1. Todo número que você citar (quantidade, data, R$, %) deve vir de uma ferramenta. Nunca estime nem invente.
 2. Antes de responder sobre estoque, validade, compras ou perdas, chame a ferramenta adequada.
 3. Se uma ferramenta devolver "erro", leia a mensagem: corrija (ex.: use o nome sugerido) ou pergunte ao usuário.
+   Produto que não existe: ofereça cadastrar e peça os dados que faltam (categoria, unidade, custo, venda, estoque mínimo, fornecedor, prazo). Nunca invente preço ou fornecedor.
 4. Pedidos de compra: para repor o que o cálculo sugere, use criar_pedidos_sugeridos (todos os fornecedores de uma vez). Use criar_pedido_compra só quando o usuário pedir algo específico, depois de calcular_reposicao. Pedidos ficam como rascunho até o dono aprovar; deixe isso claro.
 5. Para lotes em risco, priorize: promoção (vender) > doação (banco de alimentos/ONG) > descarte.
 6. Se o pedido estiver fora do seu escopo (não for sobre o estoque do comércio), diga educadamente que só ajuda com estoque e desperdício, sem responder a pergunta.
@@ -152,6 +153,7 @@ def _schema_openai(func) -> dict:
 # ------------------------------------------------------------------- provedores
 class _Gemini:
     nome = "gemini"
+    registrar = staticmethod(lambda d: None)  # substituído pelo agente (log de cada chamada)
 
     def __init__(self, chave: str, avisar):
         from google import genai
@@ -187,14 +189,18 @@ class _Gemini:
             tentativa = 0
             max_tent = 2 if modelo == self.modelo else 1  # reservas: uma tentativa só, para trocar rápido
             while tentativa < max_tent:
+                t0 = time.time()
                 try:
                     resp = self.client.models.generate_content(model=modelo, contents=contents, config=self.config)
+                    self.registrar({"provedor": "gemini", "modelo": modelo, "ms": int((time.time() - t0) * 1000), "ok": True})
                     if modelo != self.modelo:
                         self.avisar(f"🔁 Gemini: usando {modelo}")
                         self.modelo = modelo
                     return resp
                 except Exception as e:
                     ultimo = str(e)
+                    self.registrar({"provedor": "gemini", "modelo": modelo, "ms": int((time.time() - t0) * 1000),
+                                    "ok": False, "erro": ultimo[:120]})
                     if "thinking" in ultimo.lower() and ajustes < 2 and self._ajustar_raciocinio():
                         ajustes += 1
                         continue  # mesma tentativa, com a configuração de raciocínio trocada
@@ -233,6 +239,7 @@ class _Gemini:
 
 class _Groq:
     nome = "groq"
+    registrar = staticmethod(lambda d: None)
 
     def __init__(self, chave: str, avisar):
         from openai import OpenAI
@@ -246,16 +253,20 @@ class _Groq:
         ultimo = ""
         for modelo in candidatos:
             for tentativa in range(2 if modelo == self.modelo else 1):
+                t0 = time.time()
                 try:
                     extra = {"reasoning_effort": GROQ_RACIOCINIO} if "gpt-oss" in modelo and GROQ_RACIOCINIO else {}
                     resp = self.client.chat.completions.create(model=modelo, messages=messages, tools=self.tools,
                                                                tool_choice="auto", temperature=0.2, **extra)
+                    self.registrar({"provedor": "groq", "modelo": modelo, "ms": int((time.time() - t0) * 1000), "ok": True})
                     if modelo != self.modelo:
                         self.avisar(f"🔁 Groq: usando {modelo}")
                         self.modelo = modelo
                     return resp
                 except Exception as e:
                     ultimo = str(e)
+                    self.registrar({"provedor": "groq", "modelo": modelo, "ms": int((time.time() - t0) * 1000),
+                                    "ok": False, "erro": ultimo[:120]})
                     if any(c in ultimo for c in ("401", "403", "invalid_api_key")):
                         raise ProvedorIndisponivel(f"chave do Groq inválida: {ultimo[:120]}")
                     if any(c in ultimo for c in ("404", "model_not_found", "decommissioned", "tool_use_failed")):
@@ -307,6 +318,8 @@ class AgenteCicloZero:
                     self.provedores.append(classes[nome](chaves[nome], self._avisar))
                 except ImportError as e:
                     print(f"[aviso] provedor {nome} sem biblioteca instalada ({e}); rode pip install -r requirements.txt")
+        for prov in self.provedores:
+            prov.registrar = lambda d: _log(self.sessao, 0, "llm", d)
         if not self.provedores:
             raise RuntimeError("Nenhum provedor configurado: defina GEMINI_API_KEY e/ou GROQ_API_KEY no arquivo .env")
 
@@ -326,6 +339,16 @@ class AgenteCicloZero:
         """Processa uma mensagem e devolve {'resposta': str, 'passos': [chamadas de ferramenta]}."""
         passos: list[dict] = []
         _log(self.sessao, 0, "usuario", mensagem)
+        t0 = time.time()
+        modelos_ini = {p.nome: p.modelo for p in self.provedores}
+
+        def fim(resultado: dict, prov=None, trocou_provedor=False) -> dict:
+            _log(self.sessao, len(passos), "fim", {
+                "segundos": round(time.time() - t0, 1), "passos": len(passos),
+                "provedor": prov.nome if prov else None, "modelo": prov.modelo if prov else None,
+                "usou_reserva": trocou_provedor or any(p.modelo != modelos_ini[p.nome] for p in self.provedores),
+                "erro": bool(resultado.get("erro_sistema"))})
+            return resultado
 
         def chamar(nome, args, passo):
             self._avisar(f"🔧 {nome}({args})")
@@ -344,19 +367,19 @@ class AgenteCicloZero:
                 erro = f"{prov.nome}: {e}"
                 _log(self.sessao, len(passos), "erro", erro)
                 if any(p["ferramenta"] in FERRAMENTAS_QUE_ALTERAM for p in passos):
-                    return {"resposta": "⚠️ O modelo caiu no meio da tarefa, depois de já ter alterado o estoque. "
+                    return fim({"resposta": "⚠️ O modelo caiu no meio da tarefa, depois de já ter alterado o estoque. "
                                         "Confira a aba Estoque antes de repetir o pedido.", "passos": passos,
-                            "erro_sistema": True}
+                            "erro_sistema": True})
                 continue
             if texto is None:
                 _log(self.sessao, MAX_PASSOS, "erro", "limite de passos atingido")
-                return {"resposta": "⚠️ Atingi o limite de passos para esta pergunta. Pode reformular de forma mais específica?",
-                        "passos": passos, "erro_sistema": True}
+                return fim({"resposta": "⚠️ Atingi o limite de passos para esta pergunta. Pode reformular de forma mais específica?",
+                            "passos": passos, "erro_sistema": True}, prov, i > 0)
             _log(self.sessao, len(passos) + 1, "resposta", f"[{prov.nome}:{prov.modelo}] {texto}")
             self.conversa += [("user", mensagem), ("assistant", texto)]
-            return {"resposta": texto, "passos": passos, "modelo": f"{prov.nome}:{prov.modelo}"}
-        return {"resposta": f"⚠️ Nenhum modelo de IA respondeu agora ({erro}). Tente de novo em instantes.",
-                "passos": passos, "erro_sistema": True}
+            return fim({"resposta": texto, "passos": passos, "modelo": f"{prov.nome}:{prov.modelo}"}, prov, i > 0)
+        return fim({"resposta": f"⚠️ Nenhum modelo de IA respondeu agora ({erro}). Tente de novo em instantes.",
+                    "passos": passos, "erro_sistema": True})
 
     def rotina_diaria(self) -> dict:
         """Modo autônomo: o agente faz a checagem completa sem o usuário perguntar nada."""

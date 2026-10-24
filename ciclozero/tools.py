@@ -175,6 +175,49 @@ def registrar_entrada(produto: str, quantidade: float, validade: str) -> dict:
                 "saldo_atual": _saldo(conn, p["id"])}
 
 
+def cadastrar_produto(nome: str, categoria: str, unidade: str, preco_custo: float, preco_venda: float,
+                      estoque_minimo: float, fornecedor: str, prazo_entrega_dias: int) -> dict:
+    """Cadastra um produto novo. Use SOMENTE com dados informados pelo usuário; se faltar algum, pergunte.
+
+    Args:
+        nome: nome do produto, ex.: 'Picanha'.
+        categoria: ex.: 'Carnes', 'Padaria', 'Laticínios', 'Hortifruti', 'Frios', 'Mercearia'.
+        unidade: 'kg' ou 'un'.
+        preco_custo: quanto o comércio paga por unidade/kg, em R$.
+        preco_venda: preço de venda por unidade/kg, em R$.
+        estoque_minimo: quantidade mínima que deve ter na loja.
+        fornecedor: nome do fornecedor.
+        prazo_entrega_dias: dias que o fornecedor leva para entregar.
+    """
+    unidade = (unidade or "").strip().lower()
+    if unidade not in ("kg", "un"):
+        return {"erro": "unidade deve ser 'kg' ou 'un'."}
+    if not nome or not nome.strip():
+        return {"erro": "nome do produto vazio."}
+    if preco_custo is None or preco_venda is None or preco_custo <= 0 or preco_venda <= 0:
+        return {"erro": "preço de custo e de venda precisam ser maiores que zero; pergunte ao usuário."}
+    if estoque_minimo is None or estoque_minimo < 0 or prazo_entrega_dias is None or prazo_entrega_dias < 0:
+        return {"erro": "estoque mínimo e prazo de entrega não podem ser negativos."}
+    with conectar() as conn:
+        existentes = [r["nome"] for r in conn.execute("SELECT nome FROM produtos")]
+        alvo = _norm(nome)
+        if alvo in {_norm(n) for n in existentes}:
+            return {"erro": f"'{nome}' já está cadastrado."}
+        parecidos = difflib.get_close_matches(alvo, [_norm(n) for n in existentes], n=1, cutoff=0.85)
+        if parecidos:
+            original = next(n for n in existentes if _norm(n) == parecidos[0])
+            return {"erro": f"Já existe '{original}', muito parecido. Confirme com o usuário se é outro produto."}
+        conn.execute(
+            "INSERT INTO produtos (nome, categoria, unidade, preco_custo, preco_venda, estoque_minimo, fornecedor, prazo_entrega_dias)"
+            " VALUES (?,?,?,?,?,?,?,?)",
+            (nome.strip(), categoria, unidade, preco_custo, preco_venda, estoque_minimo, fornecedor, int(prazo_entrega_dias)))
+    aviso = "Atenção: preço de venda menor que o custo." if preco_venda < preco_custo else None
+    r = {"ok": True, "produto": nome.strip(), "unidade": unidade, "margem": f"{(preco_venda / preco_custo - 1):.0%}"}
+    if aviso:
+        r["aviso"] = aviso
+    return r
+
+
 def registrar_saida(produto: str, quantidade: float, tipo: str = "venda", motivo: str = "") -> dict:
     """Registra uma saída do estoque, consumindo primeiro os lotes que vencem antes (FEFO).
 
@@ -416,6 +459,7 @@ def relatorio_desperdicio(dias: int = 30) -> dict:
 # Ferramentas expostas ao agente (a aprovação de pedidos NÃO está aqui: é só humana)
 FERRAMENTAS = [
     consultar_estoque,
+    cadastrar_produto,
     registrar_entrada,
     registrar_saida,
     listar_produtos_vencendo,

@@ -175,6 +175,22 @@ with aba_pedidos:
                     st.rerun()
 
 with aba_log:
+    from ciclozero.metricas import metricas_agente
+    m = metricas_agente()
+    st.subheader("Saúde do agente")
+    st.caption("Sinais de degradação: latência p95 subindo, mais erros do modelo, mais trocas para o modelo reserva "
+               "ou mais erros de ferramenta (modelo chamando com argumentos ruins).")
+    k1, k2, k3, k4, k5 = st.columns(5)
+    k1.metric("Perguntas", m["perguntas"])
+    k2.metric("Tempo médio", f"{m['latencia_media_pergunta_s']:.1f} s".replace(".", ","))
+    k3.metric("Tempo p95", f"{m['latencia_p95_pergunta_s']:.1f} s".replace(".", ","))
+    k4.metric("Erro do modelo", m["taxa_erro_llm"])
+    k5.metric("Usou reserva", m["trocas_para_reserva"])
+    st.caption(f"{m['chamadas_ferramenta']} chamadas de ferramenta · {m['erros_de_ferramenta']} devolveram erro "
+               f"(e o agente se corrigiu ou perguntou) · {m['perguntas_com_erro']} perguntas sem resposta")
+    if m["por_modelo"]:
+        st.dataframe(pd.DataFrame(m["por_modelo"]), width="stretch", hide_index=True)
+    st.subheader("Registro passo a passo")
     st.caption("Cada passo do agente fica registrado: o que recebeu, quais ferramentas chamou e o que respondeu.")
     with conectar() as conn:
         log = pd.read_sql("SELECT sessao, passo, tipo, conteudo, criado_em FROM log_agente ORDER BY id DESC LIMIT 200", conn)
