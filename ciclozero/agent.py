@@ -64,7 +64,9 @@ ROTINA_DIARIA = (
     "Execute a rotina diária de abertura da loja: (1) analise o risco de desperdício dos próximos 5 dias, "
     "(2) monte o plano de ação por lote (promoção com preço, doação ou descarte), "
     "(3) calcule a reposição e crie rascunhos de pedido por fornecedor apenas para o que for realmente necessário, "
-    "(4) termine com um resumo: R$ em risco, R$ que o plano evita perder e pedidos aguardando aprovação."
+    "(4) termine com um resumo usando EXATAMENTE os campos de 'resumo' da análise: perda total se nada for feito, "
+    "receita recuperada com as promoções, custo dos itens que vão para doação, e os pedidos aguardando aprovação. "
+    "Não some nem recalcule valores."
 )
 
 _FERR_POR_NOME = {f.__name__: f for f in FERRAMENTAS}

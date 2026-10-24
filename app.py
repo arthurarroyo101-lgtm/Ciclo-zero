@@ -60,7 +60,7 @@ perdas = tools.relatorio_desperdicio(30)
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Lotes em risco (5 dias)", len(risco["lotes_em_risco"]))
 c2.metric("R$ em risco (3 dias)", reais(vencendo["valor_total_em_risco"]))
-c3.metric("Perda evitável pelo plano", reais(risco["perda_evitavel_rs"]))
+c3.metric("Perda projetada sem ação", reais(risco["resumo"]["perda_total_sem_acao_rs"]))
 c4.metric("Perdas últimos 30 dias", reais(perdas["total_perdas_rs"]), perdas["perdas_sobre_faturamento"] + " do faturamento",
           delta_color="off")
 

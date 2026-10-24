@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import math
 import unicodedata
 from datetime import date, datetime, timedelta
 
@@ -250,7 +251,10 @@ def analisar_risco_desperdicio(dias: int = 5) -> dict:
             demanda = max(0.0, media * (dias_rest + 1) - ja_usada) if dias_rest >= 0 else 0.0
             vende = min(l["quantidade"], demanda)
             vendavel_ate[l["produto_id"]] = ja_usada + vende
-            sobra = round(l["quantidade"] - vende, 2)
+            sobra = l["quantidade"] - vende
+            # produto vendido por unidade não tem fração: arredonda a sobra para cima
+            sobra = float(math.ceil(sobra - 1e-9)) if l["unidade"] != "kg" else round(sobra, 1)
+            sobra = max(sobra, 0.0)
             perda_rs = round(sobra * l["preco_custo"], 2)
             if dias_rest < 0:
                 acao, desconto = "descartar", 0
@@ -263,17 +267,33 @@ def analisar_risco_desperdicio(dias: int = 5) -> dict:
                 frac = sobra / l["quantidade"]
                 desconto = round(min(DESCONTO_MAX, 0.15 + 0.5 * frac), 2)
                 acao = "promocao"
-            item = {"lote": l["id"], "produto": l["nome"], "quantidade": l["quantidade"], "unidade": l["unidade"],
+            item = {"lote": l["id"], "produto": l["nome"], "quantidade_no_lote": l["quantidade"], "unidade": l["unidade"],
                     "validade": l["validade"], "dias_para_vencer": dias_rest, "media_vendas_dia": media,
-                    "projecao_sobra": max(sobra, 0), "perda_estimada_rs": max(perda_rs, 0), "acao": acao}
+                    "sobra_projetada": sobra, "perda_sem_acao_rs": perda_rs, "acao": acao}
             if acao == "promocao":
                 item["desconto_sugerido"] = f"{int(desconto * 100)}%"
                 item["preco_promocional"] = round(l["preco_venda"] * (1 - desconto), 2)
+                item["receita_recuperada_rs"] = round(sobra * item["preco_promocional"], 2)
                 item["abaixo_do_custo"] = item["preco_promocional"] < l["preco_custo"]
+            if acao == "doacao":
+                item["quantidade_para_doar"] = sobra
             resultado.append(item)
     em_risco = [r for r in resultado if r["acao"] != "ok"]
-    return {"data": _hoje().isoformat(), "lotes_analisados": len(resultado), "lotes_em_risco": em_risco,
-            "perda_evitavel_rs": round(sum(r["perda_estimada_rs"] for r in em_risco if r["acao"] != "descartar"), 2)}
+    soma = lambda chave, acao=None: round(sum(r.get(chave, 0) for r in em_risco if acao is None or r["acao"] == acao), 2)
+    return {
+        "data": _hoje().isoformat(),
+        "lotes_analisados": len(resultado),
+        "lotes_em_risco": em_risco,
+        "resumo": {
+            "qtd_lotes_em_risco": len(em_risco),
+            "perda_total_sem_acao_rs": soma("perda_sem_acao_rs"),
+            "receita_recuperada_com_promocoes_rs": soma("receita_recuperada_rs", "promocao"),
+            "custo_dos_itens_em_promocao_rs": soma("perda_sem_acao_rs", "promocao"),
+            "custo_dos_itens_para_doacao_rs": soma("perda_sem_acao_rs", "doacao"),
+            "custo_ja_vencido_para_descarte_rs": soma("perda_sem_acao_rs", "descartar"),
+            "lotes_por_acao": {a: sum(1 for r in em_risco if r["acao"] == a) for a in ("promocao", "doacao", "descartar")},
+        },
+    }
 
 
 def calcular_reposicao() -> dict:
