@@ -365,20 +365,20 @@ def render_alertas_excesso(maximo: int = 3) -> None:
         u = a["unidade"]
         verbo = "Saíram do forno" if a["origem"] == "producao" else "Chegaram"
         st.warning(
-            f"🚨 **{a['hora']} · {verbo} {a['quantidade']:g} {u} de {a['produto']}** — a loja vende ~{a['media_dia']:g} {u}/dia "
+            f"**{a['hora']}: {verbo.lower()} {a['quantidade']:g} {u} de {a['produto']}** — a loja vende ~{a['media_dia']:g} {u}/dia "
             f"e vence em {a['validade_dias']} dia(s): **~{a['sobra']:g} {u} vão para o lixo "
             f"({_reais(a['excesso_rs']).replace('$', chr(92) + '$')})**. "
             + (f"Com o Ciclo Zero, o {'plano de produção' if a['origem'] == 'producao' else 'pedido'} sugerido seria "
                f"**{a['ideal']:g} {u}**." if a["ideal"] > 0 else
                f"Com o Ciclo Zero, **não {'precisava produzir' if a['origem'] == 'producao' else 'precisava comprar'} "
-               f"agora**: já havia estoque suficiente."))
+               f"agora**: já havia estoque suficiente."), icon=":material/warning:")
 
 
 def controles() -> None:
     """Botão liga/desliga na barra lateral."""
     import streamlit as st
     sim = simulador()
-    ligado = st.toggle("🟢 Loja ao vivo (simulação de vendas)", value=sim.ativo,
+    ligado = st.toggle("Loja ao vivo", value=sim.ativo,
                        help="Simula vendas chegando do caixa a cada poucos segundos, como num dia de loja aberta. "
                             "Os números do painel se atualizam sozinhos.")
     if ligado and not sim.ativo:
@@ -405,7 +405,9 @@ def painel() -> None:
                  "vendas": hoje["vendas"], "caixa": fin["caixa_rs"], "lucro": fin["lucro_rs"]}
 
         if sim.ativo:
-            st.caption("🟢 Loja ao vivo" + (" (simulação acelerada de um dia de loja)" if st.session_state.get("tecnico") else ""))
+            st.markdown("<div class='cz-aovivo'><span class='cz-pulso'></span>Ao vivo"
+                        + ("<small>simulação acelerada de um dia de loja</small>" if st.session_state.get("tecnico") else "")
+                        + "</div>", unsafe_allow_html=True)
         de = lambda k: anterior.get(k, atual[k])
         _cartoes([
             {"rotulo": "Vendas hoje", "tipo": "reais", "de": de("fat"), "para": atual["fat"]},

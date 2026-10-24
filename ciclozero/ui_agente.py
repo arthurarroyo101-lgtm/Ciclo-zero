@@ -15,16 +15,16 @@ import streamlit as st
 from .graficos import CORES_ACAO, NOME_ACAO, num, reais
 
 NOMES_FERRAMENTAS = {
-    "consultar_estoque": "📦 Consultando o estoque",
-    "cadastrar_produto": "🆕 Cadastrando o produto",
-    "registrar_entrada": "📥 Registrando a chegada de mercadoria",
-    "registrar_saida": "📤 Registrando a saída",
-    "listar_produtos_vencendo": "⏰ Verificando o que vence em breve",
-    "analisar_risco_desperdicio": "⏳ Analisando o risco de desperdício, lote a lote",
-    "calcular_reposicao": "🧮 Calculando quanto comprar",
-    "criar_pedidos_sugeridos": "🧾 Montando os pedidos de compra",
-    "criar_pedido_compra": "🧾 Montando um pedido de compra",
-    "relatorio_desperdicio": "📊 Levantando as perdas do período",
+    "consultar_estoque": "Consultando o estoque",
+    "cadastrar_produto": "Cadastrando o produto",
+    "registrar_entrada": "Registrando a chegada de mercadoria",
+    "registrar_saida": "Registrando a saída",
+    "listar_produtos_vencendo": "Verificando o que vence em breve",
+    "analisar_risco_desperdicio": "Analisando o risco de desperdício, lote a lote",
+    "calcular_reposicao": "Calculando quanto comprar",
+    "criar_pedidos_sugeridos": "Montando os pedidos de compra",
+    "criar_pedido_compra": "Montando um pedido de compra",
+    "relatorio_desperdicio": "Levantando as perdas do período",
 }
 
 _FERRAMENTA = re.compile(r"^🔧\s*(\w+)\((.*)\)\s*$", re.S)
@@ -32,7 +32,7 @@ _PENSANDO = re.compile(r"^🧠\s*passo\s*(\d+)", re.I)
 
 
 def nome_amigavel(ferramenta: str) -> str:
-    return NOMES_FERRAMENTAS.get(ferramenta, f"🔧 Usando {ferramenta.replace('_', ' ')}")
+    return NOMES_FERRAMENTAS.get(ferramenta, f"Usando {ferramenta.replace('_', ' ')}")
 
 
 def _detalhe(args_txt: str) -> str:
@@ -58,7 +58,7 @@ def passo_amigavel(texto: str) -> str:
         return nome_amigavel(m.group(1)) + _detalhe(m.group(2)) + "…"
     m = _PENSANDO.match(texto or "")
     if m:
-        return "🧠 Decidindo o próximo passo…" if m.group(1) != "1" else "🧠 Entendendo o pedido…"
+        return "Decidindo o próximo passo…" if m.group(1) != "1" else "Entendendo o pedido…"
     return texto  # trocas de modelo/provedor: mantém o aviso original (mostra a robustez)
 
 
@@ -273,6 +273,24 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, [role="tab"]:
 .cz-dor { border-top: 1px solid var(--linha); padding-top: .8rem; margin-bottom: 1rem; }
 .cz-dor h4 { margin: 0 0 .35rem; font-size: 16px !important; color: var(--tinta); }
 .cz-dor p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--tinta-2); }
+
+/* Movimento: só para mostrar o que mudou ou que está vivo */
+button { transition: background-color .15s ease, border-color .15s ease, transform .08s ease; }
+button:active { transform: translateY(1px); }
+[data-testid="stBaseButton-secondary"]:hover { border-color: var(--folha) !important; color: var(--folha) !important; }
+[data-testid="stBaseButton-primary"]:hover { background: #255830 !important; border-color: #255830 !important; }
+button [data-testid="stIconMaterial"] { font-size: 1.15em; }
+.stTabs [role="tab"] [data-testid="stIconMaterial"] { color: var(--tinta-2); transition: color .15s ease; }
+.stTabs [aria-selected="true"] [data-testid="stIconMaterial"] { color: var(--folha); }
+.stTabs [role="tab"]:hover p, .stTabs [role="tab"]:hover [data-testid="stIconMaterial"] { color: var(--folha) !important; }
+[data-baseweb="tab-highlight"] { background: var(--folha) !important; transition: left .25s ease, width .25s ease !important; }
+.cz-aovivo { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--folha); }
+.cz-aovivo small { font-weight: 400; color: var(--tinta-2); }
+.cz-pulso { width: 9px; height: 9px; border-radius: 50%; background: var(--folha); position: relative; }
+.cz-pulso::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--folha);
+                   animation: cz-pulso 1.6s ease-out infinite; }
+@keyframes cz-pulso { from { transform: scale(1); opacity: .6; } to { transform: scale(2.6); opacity: 0; } }
+[data-testid="stChatMessageAvatarCustom"], [data-testid="stChatMessage"] [data-testid="stIconMaterial"] { color: var(--folha); }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>

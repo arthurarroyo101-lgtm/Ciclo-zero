@@ -32,7 +32,7 @@ def render(obter_agente) -> None:
 
     n_aprendidos = nf.aprendidos()
     if n_aprendidos:
-        st.caption(f"📚 Esta loja já ensinou **{n_aprendidos}** descrições de nota ao sistema — "
+        st.caption(f"Esta loja já ensinou **{n_aprendidos}** descrições de nota ao sistema — "
                    "cada confirmação ou correção é lembrada na próxima nota.")
     exemplos = sorted(EXEMPLOS.glob("nota_exemplo_*.png"))
     opcoes = ["Enviar foto", "Câmera"] + [f"Exemplo: {e.stem.replace('nota_exemplo_', '').title()}" for e in exemplos]
@@ -61,9 +61,9 @@ def render(obter_agente) -> None:
             escolha = st.radio("Como ler", list(opcoes_metodo), horizontal=True,
                                help="Automático: tenta a visão do Gemini e, se falhar, o OCR local (Tesseract) "
                                     "+ IA de texto. O OCR roda no seu computador.")
-            if st.button("Ler nota", type="primary"):
+            if st.button("Ler nota", type="primary", icon=":material/document_scanner:"):
                 with st.status("Lendo a nota...", expanded=True) as status:
-                    status.write("👁️ lendo a nota: fornecedor, itens e valores" +
+                    status.write("Lendo a nota: fornecedor, itens e valores" +
                                  (" (OCR local + IA de texto)" if opcoes_metodo[escolha] == "ocr" else ""))
                     try:
                         dados = nf.ler_nota(imagem, mime, opcoes_metodo[escolha])
@@ -71,8 +71,8 @@ def render(obter_agente) -> None:
                         status.update(label="Não consegui ler a nota", state="error")
                         st.error(str(e))
                         return
-                    status.write(f"✔️ {len(dados['itens'])} itens lidos em {dados['segundos']} s ({dados['modelo']})")
-                    status.write("🔗 associando itens ao cadastro e sugerindo validade")
+                    status.write(f"{len(dados['itens'])} itens lidos em {dados['segundos']} s ({dados['modelo']})")
+                    status.write("Associando itens ao cadastro e sugerindo validade")
                     st.session_state.nota_dados = dados
                     st.session_state.nota_linhas = nf.conciliar(dados)
                     st.session_state.pop("nota_resultado", None)
@@ -123,7 +123,7 @@ def render(obter_agente) -> None:
         st.info("Itens sem produto correspondente não serão lançados: " + ", ".join(faltando) +
                 ". Cadastre-os pelo chat do agente (ex.: \"cadastra o produto Manteiga...\").")
 
-    if st.button("Lançar no estoque", type="primary"):
+    if st.button("Lançar no estoque", type="primary", icon=":material/move_to_inbox:"):
         linhas = [r for r in editado.to_dict("records") if r["lancar"] and r["produto"]]
         resultado = nf.registrar_nota(linhas, dados)
         st.session_state.nota_resultado = resultado
@@ -139,9 +139,11 @@ def render(obter_agente) -> None:
     resultado = st.session_state.get("nota_resultado")
     if resultado:
         if resultado["lancados"]:
-            st.success(f"{len(resultado['lancados'])} lote(s) lançado(s) no estoque: " +
-                       ", ".join(f"{r['quantidade']:g} {r['produto']} (validade {r['validade'][8:10]}/{r['validade'][5:7]})"
-                                 for r in resultado["lancados"]))
+            n = len(resultado["lancados"])
+            st.success(f"{n} {'lote entrou' if n == 1 else 'lotes entraram'} no estoque.", icon=":material/check_circle:")
+            st.dataframe(pd.DataFrame([{"Produto": r["produto"], "Quantidade": f"{r['quantidade']:g}",
+                                        "Validade": f"{r['validade'][8:10]}/{r['validade'][5:7]}"}
+                                       for r in resultado["lancados"]]), hide_index=True, width="content")
         for r in resultado["recusados"]:
             st.error(f"{r.get('produto')}: {r.get('erro')}")
         analise = st.session_state.get("nota_analise")

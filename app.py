@@ -63,7 +63,7 @@ with st.sidebar:
     with st.expander("Personalizar"):
         st.text_input("Seu nome", key="nome_usuario", placeholder="Ex.: João",
                       help="Aparece na mensagem de boas-vindas. Com login configurado, o nome vem dele.")
-    if st.button("Recriar dados de exemplo"):
+    if st.button("Recriar dados de exemplo", icon=":material/restart_alt:"):
         from ciclozero.seed import popular
         _ao_vivo.simulador().parar()  # não escrever no banco enquanto ele é recriado
         popular()
@@ -78,8 +78,10 @@ risco = tools.analisar_risco_desperdicio()
 vencendo = tools.listar_produtos_vencendo(3)
 perdas = tools.relatorio_desperdicio(30)
 
-_nomes_abas = ["💬 Agente", "📷 Nota fiscal", "📊 Dashboard", "📦 Estoque", "🧾 Pedidos"]
-_abas = st.tabs(_nomes_abas + (["🔍 Rastreio"] if tecnico else []))
+# ícones Material (monocromáticos, mesmo traço): a palavra explica, o ícone só ajuda a achar
+_nomes_abas = [":material/forum: Agente", ":material/receipt_long: Nota fiscal", ":material/monitoring: Dashboard",
+               ":material/inventory_2: Estoque", ":material/local_shipping: Pedidos"]
+_abas = st.tabs(_nomes_abas + ([":material/manage_search: Rastreio"] if tecnico else []))
 aba_chat, aba_nota, aba_dash, aba_painel, aba_pedidos = _abas[:5]
 aba_log = _abas[5] if tecnico else st.empty()  # Rastreio só no modo técnico
 
@@ -93,7 +95,7 @@ with aba_chat:
     else:
         agente = get_agente(chave)
         st.session_state.setdefault("chat", [])
-        if st.button("Rodar rotina diária", type="primary",
+        if st.button("Rodar rotina diária", type="primary", icon=":material/play_arrow:",
                      help="O agente confere o que vence, monta o plano de cada lote e prepara os pedidos de compra."):
             with st.status("Conferindo a loja...", expanded=True) as status:
                 agente.ao_passo = lambda t: status.write(ui_agente.passo_amigavel(t))
@@ -103,7 +105,7 @@ with aba_chat:
             st.session_state.chat.append(("user", "Rotina diária"))
             st.session_state.chat.append(("assistant", r))
         for papel, conteudo in st.session_state.chat:
-            with st.chat_message(papel, avatar="♻️" if papel == "assistant" else None):
+            with st.chat_message(papel, avatar=":material/recycling:" if papel == "assistant" else ":material/person:"):
                 if papel == "user":
                     st.markdown(conteudo)
                     continue
@@ -258,14 +260,14 @@ with aba_pedidos:
                     st.caption(p["justificativa"])
                 if estado == "rascunho":
                     a, b = st.columns(2)
-                    if a.button("Aprovar pedido", key=f"ok{p['id']}", type="primary"):
+                    if a.button("Aprovar pedido", key=f"ok{p['id']}", type="primary", icon=":material/check:"):
                         tools.decidir_pedido(p["id"], True)
                         st.rerun()
-                    if b.button("Recusar", key=f"no{p['id']}"):
+                    if b.button("Recusar", key=f"no{p['id']}", icon=":material/close:"):
                         tools.decidir_pedido(p["id"], False)
                         st.rerun()
                 elif estado == "aprovado":
-                    if st.button("Chegou: lançar no estoque", key=f"rec{p['id']}",
+                    if st.button("Chegou: lançar no estoque", key=f"rec{p['id']}", icon=":material/move_to_inbox:",
                                  help="A mercadoria chegou. Ela entra no estoque e o valor sai do caixa."):
                         tools.receber_pedido(p["id"])
                         st.rerun()
