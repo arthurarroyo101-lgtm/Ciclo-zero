@@ -51,6 +51,13 @@ CREATE TABLE IF NOT EXISTS pedidos (
     justificativa TEXT,
     criado_em TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS apelidos (
+    descricao TEXT PRIMARY KEY,      -- descrição da nota normalizada (ex.: "leite uht integral 1l cx")
+    produto_id INTEGER NOT NULL REFERENCES produtos(id),
+    fornecedor TEXT,
+    vezes INTEGER DEFAULT 1,
+    atualizado_em TEXT DEFAULT (datetime('now','localtime'))
+);
 CREATE TABLE IF NOT EXISTS log_agente (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sessao TEXT,

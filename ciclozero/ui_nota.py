@@ -12,7 +12,7 @@ import streamlit as st
 from . import nota_fiscal as nf
 from .db import conectar
 
-EXEMPLO = Path(__file__).resolve().parent.parent / "docs" / "exemplos" / "nota_exemplo_ceasa.png"
+EXEMPLOS = Path(__file__).resolve().parent.parent / "docs" / "exemplos"
 
 
 def _reais(v) -> str:
@@ -25,8 +25,13 @@ def render(obter_agente) -> None:
     st.caption("Tire uma foto da nota do fornecedor. O agente lê os itens, associa ao seu cadastro e sugere a "
                "validade. Você confere e confirma: **nada entra no estoque sem a sua confirmação.**")
 
-    origem = st.radio("Origem da nota", ["Enviar foto", "Câmera", "Nota de exemplo (demo)"], horizontal=True,
-                      label_visibility="collapsed")
+    n_aprendidos = nf.aprendidos()
+    if n_aprendidos:
+        st.caption(f"📚 Esta loja já ensinou **{n_aprendidos}** descrições de nota ao sistema — "
+                   "cada confirmação ou correção é lembrada na próxima nota.")
+    exemplos = sorted(EXEMPLOS.glob("nota_exemplo_*.png"))
+    opcoes = ["Enviar foto", "Câmera"] + [f"Exemplo: {e.stem.replace('nota_exemplo_', '').title()}" for e in exemplos]
+    origem = st.radio("Origem da nota", opcoes, horizontal=True, label_visibility="collapsed")
     imagem, mime = None, "image/png"
     if origem == "Enviar foto":
         arq = st.file_uploader("Foto ou print da nota", type=["png", "jpg", "jpeg", "webp"])
@@ -36,8 +41,9 @@ def render(obter_agente) -> None:
         foto = st.camera_input("Fotografe a nota")
         if foto:
             imagem, mime = foto.getvalue(), "image/jpeg"
-    elif EXEMPLO.exists():
-        imagem = EXEMPLO.read_bytes()
+    else:
+        escolhido = exemplos[opcoes.index(origem) - 2]
+        imagem = escolhido.read_bytes()
 
     if imagem:
         c1, c2 = st.columns([1, 2])
@@ -88,7 +94,8 @@ def render(obter_agente) -> None:
             "unidade": st.column_config.TextColumn("Un", disabled=True),
             "validade": st.column_config.TextColumn("Validade (DD/MM/AAAA)"),
             "custo_unitario": st.column_config.NumberColumn("Custo un.", format="R$ %.2f", disabled=True),
-            "confianca": st.column_config.ProgressColumn("Confiança", min_value=0.0, max_value=1.0, format="%.0f%%"),
+            "confianca": st.column_config.ProgressColumn("Confiança", min_value=0.0, max_value=1.0, format="%.2f"),
+            "origem": st.column_config.TextColumn("Como associou", disabled=True),
             "avisos": st.column_config.TextColumn("Avisos", disabled=True),
         })
     faltando = [r["descricao_nota"] for r in editado.to_dict("records") if r["lancar"] and not r["produto"]]

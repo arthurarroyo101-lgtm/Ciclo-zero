@@ -199,18 +199,51 @@ def _pontuar(descricao: str, nome: str) -> float:
     return round(0.7 * acerto_chave + 0.3 * acerto_total, 2)
 
 
+def _chave_apelido(descricao: str) -> str:
+    """Descrição normalizada: a mesma linha de nota sempre gera a mesma chave."""
+    txt = unicodedata.normalize("NFKD", descricao or "").encode("ascii", "ignore").decode().lower()
+    return " ".join(re.sub(r"[^a-z0-9 ]", " ", txt).split())
+
+
+def aprendidos() -> int:
+    """Quantas descrições de nota esta loja já ensinou ao sistema (ativo próprio da loja)."""
+    with conectar() as conn:
+        return conn.execute("SELECT COUNT(*) FROM apelidos").fetchone()[0]
+
+
+def _aprender(conn, descricao: str, produto: str, fornecedor: str | None) -> None:
+    pid = conn.execute("SELECT id FROM produtos WHERE nome=?", (produto,)).fetchone()
+    chave = _chave_apelido(descricao)
+    if not pid or not chave:
+        return
+    conn.execute(
+        """INSERT INTO apelidos (descricao, produto_id, fornecedor, vezes) VALUES (?,?,?,1)
+           ON CONFLICT(descricao) DO UPDATE SET produto_id=excluded.produto_id, vezes=apelidos.vezes+1,
+           fornecedor=COALESCE(excluded.fornecedor, apelidos.fornecedor), atualizado_em=datetime('now','localtime')""",
+        (chave, pid[0], fornecedor))
+
+
 def conciliar(dados: dict) -> list[dict]:
-    """Uma linha por item da nota, já com o produto sugerido, quantidade, validade e custo."""
+    """Uma linha por item da nota, já com o produto sugerido, quantidade, validade e custo.
+    Primeiro procura no que a loja já ensinou (apelidos); se não houver, usa a semelhança de palavras."""
     with conectar() as conn:
         produtos = [dict(r) for r in conn.execute("SELECT * FROM produtos")]
+        por_id = {p["id"]: p for p in produtos}
+        memoria = {r["descricao"]: (por_id.get(r["produto_id"]), r["vezes"])
+                   for r in conn.execute("SELECT descricao, produto_id, vezes FROM apelidos")}
     hoje = date.today()
     linhas = []
     for item in dados.get("itens", []):
         desc = str(item.get("descricao") or "")
-        ranking = sorted(((_pontuar(desc, p["nome"]), p) for p in produtos), key=lambda x: -x[0])
-        score, prod = ranking[0] if ranking else (0, None)
-        if score < 0.5:
-            prod = None
+        aprendido = memoria.get(_chave_apelido(desc))
+        if aprendido and aprendido[0]:
+            prod, score, origem = aprendido[0], 1.0, f"aprendido ({aprendido[1]}x)"
+        else:
+            ranking = sorted(((_pontuar(desc, p["nome"]), p) for p in produtos), key=lambda x: -x[0])
+            score, prod = ranking[0] if ranking else (0, None)
+            origem = "semelhança"
+            if score < 0.5:
+                prod, origem = None, "—"
         qtd, vu = item.get("quantidade"), item.get("valor_unitario")
         avisos = []
         if prod is None:
@@ -233,6 +266,7 @@ def conciliar(dados: dict) -> list[dict]:
             "validade": validade.strftime("%d/%m/%Y"),
             "custo_unitario": vu,
             "confianca": score,
+            "origem": origem,
             "avisos": "; ".join(avisos),
         })
     return linhas
@@ -248,6 +282,10 @@ def registrar_nota(linhas: list[dict], dados: dict | None = None) -> dict:
             continue
         r = registrar_entrada(ln.get("produto") or "", float(ln.get("quantidade") or 0), str(ln.get("validade") or ""))
         (lancados if r.get("ok") else recusados).append({"produto": ln.get("produto"), **r})
+        if r.get("ok") and ln.get("descricao_nota"):
+            # o dono confirmou (ou corrigiu) a associação: a loja ensina o sistema
+            with conectar() as conn:
+                _aprender(conn, ln["descricao_nota"], r["produto"], (dados or {}).get("fornecedor"))
     try:
         with conectar() as conn:
             conn.execute("INSERT INTO log_agente (sessao, passo, tipo, conteudo) VALUES (?,?,?,?)",

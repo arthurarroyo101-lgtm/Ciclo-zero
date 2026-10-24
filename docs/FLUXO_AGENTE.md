@@ -37,6 +37,7 @@ foto da nota ──► modelo de visão (Gemini; reserva: Groq/Llama 4) ──�
 ```
 - **Qualidade da leitura medida sem gabarito:** se a soma dos itens bate com o total impresso, a leitura é marcada como verificada; se não, a tela pede atenção.
 - **Item desconhecido** (ex.: manteiga não cadastrada) não é lançado; o dono cadastra pelo chat.
+- **Aprende com a loja (ativo próprio):** toda associação confirmada ou corrigida pelo dono ("IOG NAT DANONE 170G" → Iogurte natural 170g) é guardada na tabela `apelidos`. Na próxima nota, o item sai associado com confiança 100% e a coluna "Como associou" mostra "aprendido (Nx)". Cada loja constrói o próprio dicionário de fornecedores/produtos — dado proprietário que melhora com o uso.
 - Código: `ciclozero/nota_fiscal.py` · tela: `ciclozero/ui_nota.py` · teste offline: `python -m tests.test_nota_fiscal`.
 
 ## Ferramentas (o que o agente sabe fazer)

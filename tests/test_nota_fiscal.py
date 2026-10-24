@@ -52,6 +52,18 @@ def main():
     depois = consultar_estoque("banana")["itens"][0]["saldo"]
     ok &= checar("lança 4 lotes e recusa 0", len(r["lancados"]) == 4 and not r["recusados"])
     ok &= checar("saldo da banana +40 kg", abs(depois - antes - 40) < 0.01, f"({antes} -> {depois})")
+    # aprendizado: a mesma nota, de novo, sai associada pelo que a loja ensinou
+    de_novo = nf.conciliar(LEITURA)
+    aprendidas = [l for l in de_novo if l["origem"].startswith("aprendido")]
+    ok &= checar("aprende as 4 associações confirmadas", len(aprendidas) == 4 and nf.aprendidos() == 4,
+                 f"({len(aprendidas)} aprendidas)")
+    # correção do dono também é aprendida: "IOG NAT DANONE" -> Iogurte
+    corr = {"fornecedor": "X", "valor_total": 21, "itens": [
+        {"descricao": "IOG DNN 170", "quantidade": 10, "unidade": "UN", "valor_unitario": 2.1, "valor_total": 21}]}
+    ln = nf.conciliar(corr)
+    ln[0].update(produto="Iogurte natural 170g", lancar=True)
+    nf.registrar_nota(ln, corr)
+    ok &= checar("aprende correção manual do dono", nf.conciliar(corr)[0]["produto"] == "Iogurte natural 170g")
     print("\nResultado:", "TUDO OK" if ok else "FALHOU")
     return 0 if ok else 1
 
