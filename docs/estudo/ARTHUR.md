@@ -1,4 +1,4 @@
-# Estudo: Arthur (negócio, validação e roteiro do pitch)
+# Estudo: Arthur Arroyo Cabral (negócio, validação e roteiro do pitch)
 
 > Leia só este arquivo. Ele resume o que **você** precisa saber para apresentar e responder à banca.
 > Pitch às 16h. Tudo no GitHub até 15h30. Slides: `docs/pitch.pdf` (falas nas notas de cada slide).

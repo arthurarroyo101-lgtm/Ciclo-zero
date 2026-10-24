@@ -1,4 +1,4 @@
-# Estudo: João Paulo (apresentador do pitch, interface e dados)
+# Estudo: João Paulo Pires de Mello (apresentador do pitch, interface e dados)
 
 > Leia só este arquivo. Ele resume o que **você** precisa saber para apresentar e responder à banca.
 > Pitch às 16h. Tudo no GitHub até 15h30. Slides: `docs/pitch.pdf`.
@@ -20,14 +20,14 @@
 | Slide | Tempo | O que falar (resumo) |
 |---|---|---|
 | 1. Capa | 0:00–0:30 | "E se parte do lucro da sua loja estivesse vencendo na prateleira? O desperdício nem sempre começa no lixo: começa numa compra sem informação ou num produto que vence antes de ser vendido. Criamos o Ciclo Zero para agir antes disso." |
-| 2. Problema | 0:30–1:10 | "O dono decide todo dia o que comprar e o que vender primeiro. Quando isso fica no caderno ou na cabeça, o excesso só aparece quando já virou perda. No Canto Caseiro ouvimos: controle 'no olhômetro'." |
+| 2. Problema | 0:30–1:10 | "O dono decide todo dia o que comprar e o que vender primeiro. Entrevistamos a gerente de vendas do Canto Caseiro: ela estima as compras 'no olhômetro', repete anotações todo dia e gasta algumas horas nisso. Quer automatizar o registro e ter uma estimativa de compra, e pagaria se fosse acessível." |
 | 3. Sem e com | 1:10–1:55 | "Sem apoio, ele cruza tudo sozinho. Com o Ciclo Zero, a nota prepara a entrada, cada lote é acompanhado e o agente aponta riscos e prepara pedidos. A decisão final é sempre do dono." |
 | 4. Como funciona | 1:55–2:45 | "Registrar, acompanhar, agir antes da perda e aprovar. Nada entra no estoque sem confirmação; pedido é rascunho até o dono aprovar." |
 | 5. Demo | ~85 s | "Os dados desta demonstração são fictícios; as vendas são simuladas. Matheus, mostra pra gente." (o Matheus opera; você pode narrar junto) |
 | 6. Confiança | ~20 s | "Todo número vem do banco e é calculado em código, a IA não inventa. As regras de lei vêm de uma base conferida no site oficial. E testamos o agente em 16 situações; as falhas viraram travas." |
 | 7. Validação | 2:45–3:40 | "Duas entrevistas, resultados diferentes: no Canto Caseiro a dor é real; no Subway, o sistema da franquia já atende. Nosso cliente é quem controla na mão. Ainda não provamos redução de perdas." |
 | 8. Modelo de negócio | ~20 s | "Assinatura por loja: 30 dias grátis e depois R$ 49 por mês, uma hipótese que o piloto vai validar. Venda direta no bairro, demonstrações e indicações." |
-| 9. Próximo passo e equipe | 3:40–4:15 | "Matheus no agente e nos testes, eu na interface e nos dados, Arthur no negócio e na validação. Próximo passo: piloto de 30 dias medindo tempo, alertas, perdas, custo e se o cliente pagaria." |
+| 9. Próximo passo e equipe | 3:40–4:15 | "Matheus de Melo Sari no agente e nos testes, eu, João Paulo Pires de Mello, na interface e nos dados, e Arthur Arroyo Cabral no negócio e na validação. Próximo passo: piloto de 30 dias medindo tempo, alertas, perdas, custo e se o cliente pagaria." |
 | 10. Fechamento | 4:15–5:00 | "Não queremos prometer que a IA resolve tudo: queremos testar e medir. Não dá para recuperar o que já venceu. Mas dá para decidir melhor antes. Obrigado." |
 
 **Regras de ouro ao falar:** dizer que os dados são fictícios; não prometer economia ("o piloto vai medir"); não dizer que temos parceiro; o R$ 49 é hipótese.

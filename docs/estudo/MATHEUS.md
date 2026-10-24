@@ -1,4 +1,4 @@
-# Estudo: Matheus (agente de IA, operação da demo)
+# Estudo: Matheus de Melo Sari (agente de IA, operação da demo)
 
 > Leia só este arquivo. Ele resume o que **você** precisa saber para apresentar e responder à banca.
 > Pitch às 16h. Tudo no GitHub até 15h30. Slides: `docs/pitch.pdf`.
