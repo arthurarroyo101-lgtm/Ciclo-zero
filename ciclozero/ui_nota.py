@@ -85,7 +85,8 @@ def render(obter_agente) -> None:
         nomes = [r["nome"] for r in conn.execute("SELECT nome FROM produtos ORDER BY nome")]
     df = pd.DataFrame(st.session_state.nota_linhas)
     # exibição no padrão brasileiro (a quantidade continua número para poder editar)
-    df["produto"] = df["produto"].fillna("")
+    SEM = "(não cadastrado)"
+    df["produto"] = df["produto"].fillna("").replace("", SEM)
     df["custo_unitario"] = df["custo_unitario"].map(lambda v: "" if v is None or pd.isna(v) else _reais(v))
     df["confianca"] = (df["confianca"].fillna(0) * 100).round().astype(int)
     editado = st.data_editor(
@@ -93,7 +94,7 @@ def render(obter_agente) -> None:
         column_config={
             "lancar": st.column_config.CheckboxColumn("Lançar?"),
             "descricao_nota": st.column_config.TextColumn("Na nota", disabled=True),
-            "produto": st.column_config.SelectboxColumn("Produto no estoque", options=[""] + nomes),
+            "produto": st.column_config.SelectboxColumn("Produto no estoque", options=[SEM] + nomes),
             "quantidade": st.column_config.NumberColumn("Qtd", min_value=0.0, step=0.1, format="%g"),
             "unidade": st.column_config.TextColumn("Un", disabled=True),
             "validade": st.column_config.TextColumn("Validade (DD/MM/AAAA)"),
@@ -102,6 +103,7 @@ def render(obter_agente) -> None:
             "origem": st.column_config.TextColumn("Como associou", disabled=True),
             "avisos": st.column_config.TextColumn("Avisos", disabled=True),
         })
+    editado["produto"] = editado["produto"].replace(SEM, "")
     faltando = [r["descricao_nota"] for r in editado.to_dict("records") if r["lancar"] and not r["produto"]]
     if faltando:
         st.info("Itens sem produto correspondente não serão lançados: " + ", ".join(faltando) +

@@ -75,10 +75,13 @@ def _saldo(conn, produto_id: int) -> float:
 
 
 def _media_vendas_dia(conn, produto_id: int) -> float:
+    """Média diária dos últimos dias FECHADOS (sem hoje): o dia em andamento distorceria a previsão
+    (ex.: manhã fraca derruba a média; simulação acelerada a infla)."""
     inicio = (_hoje() - timedelta(days=JANELA_VENDAS_DIAS)).isoformat()
     r = conn.execute(
-        "SELECT COALESCE(SUM(quantidade),0) s FROM movimentacoes WHERE produto_id=? AND tipo='venda' AND data>=?",
-        (produto_id, inicio),
+        "SELECT COALESCE(SUM(quantidade),0) s FROM movimentacoes "
+        "WHERE produto_id=? AND tipo='venda' AND data>=? AND data<?",
+        (produto_id, inicio, _hoje().isoformat()),
     ).fetchone()
     return round(r["s"] / JANELA_VENDAS_DIAS, 2)
 
