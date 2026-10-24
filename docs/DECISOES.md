@@ -58,7 +58,7 @@ Perguntas que a banca tende a fazer (seção 10 do edital): de onde vêm os fato
 ## Pendências
 - [x] Matheus com acesso de push ao repositório
 - [ ] João Paulo aceitar convite de colaborador (se ainda não aceitou)
-- [ ] Cada um criar sua chave do Gemini em https://aistudio.google.com/apikey
+- [ ] Cada um criar sua chave do **Groq** (https://console.groq.com/keys) e do Gemini (https://aistudio.google.com/apikey) e rodar `pip install -r requirements.txt` de novo
 - [ ] Entrevista rápida com comerciante conhecido (Arthur) — registrar respostas em `docs/validacao.md`
 
 ## Arquitetura (v0.1)
@@ -73,6 +73,7 @@ docs/FLUXO_AGENTE.md    → entregável: inputs, lógica, outputs (Arthur revisa
 Decisões de projeto: cálculos em Python (não no LLM) para evitar número inventado; FEFO na baixa de estoque; pedido de compra sempre como rascunho com aprovação humana; pedido > 2× o sugerido é bloqueado; desconto máximo 50%; máximo 8 passos por pergunta; modelo configurável por `GEMINI_MODEL` (padrão `gemini-3.8-flash`).
 
 ## Log
+- **2026-10-23 22:18** — ✅ **Avaliação final: 10/10 casos, fidelidade 100% (nenhum R$ inventado), latência média 11,9 s** (perguntas simples ~2 s; rotina completa 43–91 s, afetada pelo limite por minuto do Groq gratuito). Resultado em `docs/AVALIACAO.md` — evidência para o critério Solução e Uso de IA (30%).
 - **2026-10-23 22:15** — C08 e C10 passando (rotina com Groq agora cria 3 rascunhos de pedido). **Decisão: Groq como provedor principal, Gemini como reserva** (`PROVEDORES=groq,gemini`) — Groq mais rápido e sem estourar cota; Gemini estourou a cota gratuita em poucas rodadas.
 - **2026-10-23 22:12** — 1ª avaliação automática (Groq `gpt-oss-120b`): **9/10, fidelidade 100%, 15,3 s/resposta**. C08 falhou por bug do teste (agente recusou corretamente o lote vencido). C10 passou mas o Groq não criou pedidos na rotina → instrução da rotina reescrita em passos explícitos e teste endurecido (exige rascunhos). Teste agora aceita `EVAL_CASOS=C08,C10` para rodar só alguns casos e registra o modelo usado em cada caso.
 - **2026-10-23 22:05** — ✅ Primeira rotina diária completa com IA real (analisou risco → reposição → 3 pedidos rascunho → plano por lote → resumo); o fallback de modelo funcionou ao vivo (3.8-flash com cota estourada → flash-lite). Corrigido: resumo mostrava 'em risco' = 'evitado' (mesmo número); agora a análise devolve campos separados (perda sem ação, receita recuperada com promoções, custo doado, descarte). Sobra de produto vendido por unidade arredondada para cima.
