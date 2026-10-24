@@ -42,9 +42,16 @@
   .barra { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 20px; }
   .marca { font-family: var(--display); font-weight: 600; font-stretch: 100%; font-size: 24px; text-decoration: none; display: inline-flex; align-items: center; gap: 10px; }
   .marca i { width: 14px; height: 14px; border-radius: 50%; background: var(--etiqueta); display: inline-block; }
-  .barra nav { display: flex; gap: 22px; font-size: 15px; }
-  .barra nav a { color: var(--folha-clara); text-decoration: none; }
-  .barra nav a:hover { color: var(--branco); text-decoration: underline; }
+  /* navegação em destaque: botões-pílula translúcidos sobre o verde; o último (para quem é) é o convite principal */
+  .barra nav { display: flex; flex-wrap: wrap; gap: 10px; font-size: 16px; }
+  .barra nav a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 999px;
+                 color: var(--branco); font-weight: 500; text-decoration: none; background: rgba(255,255,255,.12);
+                 border: 1px solid rgba(255,255,255,.35); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+                 transition: background-color .15s ease, color .15s ease, transform .12s ease; }
+  .barra nav a::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--etiqueta); }
+  .barra nav a:hover { background: var(--etiqueta); color: var(--tinta); border-color: var(--etiqueta); }
+  .barra nav a:hover::before { background: var(--tinta); }
+  .barra nav a:active { transform: translateY(1px); }
   .hero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: clamp(28px, 5vw, 64px); align-items: center;
           padding-block: clamp(20px, 4vw, 48px) clamp(56px, 8vw, 104px); }
   .hero h1 { font-weight: 250; font-stretch: 100%; font-size: clamp(42px, 6.6vw, 84px); line-height: 1.02; letter-spacing: -.025em; color: var(--branco); }
@@ -146,7 +153,9 @@
     .hero, .dor, .recibo-bloco, .quem { grid-template-columns: minmax(0, 1fr); }
     .passos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .confianca { grid-template-columns: minmax(0, 1fr); }
-    .barra nav { display: none; }
+    .barra { flex-direction: column; align-items: flex-start; }
+    .barra nav { gap: 8px; font-size: 15px; }
+    .barra nav a { min-height: 40px; padding: 0 14px; }
   }
   @media (max-width: 480px) { .passos { grid-template-columns: minmax(0, 1fr); } }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
