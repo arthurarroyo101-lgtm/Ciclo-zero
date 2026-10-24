@@ -57,13 +57,13 @@ with st.sidebar:
     chave = "" if tem_env else st.text_input("Chave do Gemini", type="password")
     from ciclozero import ao_vivo as _ao_vivo
     _ao_vivo.controles()
-    tecnico = st.toggle("🔧 Modo técnico", key="tecnico", value=False,
+    tecnico = st.toggle("Modo técnico", key="tecnico", value=False,
                         help="Mostra o que é para a equipe e a banca: como o agente decidiu, fórmulas, lançamentos "
                              "detalhados e a aba Rastreio. Desligado = visão limpa do comerciante.")
-    with st.expander("👤 Personalizar"):
+    with st.expander("Personalizar"):
         st.text_input("Seu nome", key="nome_usuario", placeholder="Ex.: João",
                       help="Aparece na mensagem de boas-vindas. Com login configurado, o nome vem dele.")
-    if st.button("🔄 Recriar dados de exemplo"):
+    if st.button("Recriar dados de exemplo"):
         from ciclozero.seed import popular
         _ao_vivo.simulador().parar()  # não escrever no banco enquanto ele é recriado
         popular()
@@ -93,14 +93,14 @@ with aba_chat:
     else:
         agente = get_agente(chave)
         st.session_state.setdefault("chat", [])
-        if st.button("▶️ Rodar rotina diária", type="primary",
+        if st.button("Rodar rotina diária", type="primary",
                      help="O agente confere o que vence, monta o plano de cada lote e prepara os pedidos de compra."):
             with st.status("Conferindo a loja...", expanded=True) as status:
                 agente.ao_passo = lambda t: status.write(ui_agente.passo_amigavel(t))
                 r = agente.rotina_diaria()
                 status.update(label="Plano de hoje pronto", state="complete", expanded=False)
             r["rotina"] = True
-            st.session_state.chat.append(("user", "▶️ Rotina diária"))
+            st.session_state.chat.append(("user", "Rotina diária"))
             st.session_state.chat.append(("assistant", r))
         for papel, conteudo in st.session_state.chat:
             with st.chat_message(papel, avatar="♻️" if papel == "assistant" else None):
@@ -159,7 +159,7 @@ with aba_dash:
                       f"{fin['n_excessos']} compra(s) acima do que você vende" if fin["n_excessos"] else None,
                       delta_color="off",
                       help="O que entrou além do que a loja consegue vender antes de vencer. Se nada for feito, vira lixo.")
-            f5.metric("A pagar a fornecedores", reais(fin["a_pagar_rs"]),
+            f5.metric("A pagar", reais(fin["a_pagar_rs"]),
                       f"{fin['a_pagar_n']} pedido(s) aprovado(s)" if fin["a_pagar_n"] else None, delta_color="off",
                       help="Pedidos aprovados que ainda não chegaram. Quando chegam, entram no estoque e saem do caixa.")
             f6.metric("Pedidos para aprovar", fin["pedidos_pendentes"],
@@ -258,14 +258,14 @@ with aba_pedidos:
                     st.caption(p["justificativa"])
                 if estado == "rascunho":
                     a, b = st.columns(2)
-                    if a.button("✅ Aprovar pedido", key=f"ok{p['id']}", type="primary"):
+                    if a.button("Aprovar pedido", key=f"ok{p['id']}", type="primary"):
                         tools.decidir_pedido(p["id"], True)
                         st.rerun()
                     if b.button("Recusar", key=f"no{p['id']}"):
                         tools.decidir_pedido(p["id"], False)
                         st.rerun()
                 elif estado == "aprovado":
-                    if st.button("📦 Marcar como recebido", key=f"rec{p['id']}",
+                    if st.button("Chegou: lançar no estoque", key=f"rec{p['id']}",
                                  help="A mercadoria chegou. Ela entra no estoque e o valor sai do caixa."):
                         tools.receber_pedido(p["id"])
                         st.rerun()

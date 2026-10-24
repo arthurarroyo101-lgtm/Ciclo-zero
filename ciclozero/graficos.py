@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import pandas as pd
 
-# Cores por ação recomendada (mesma leitura em tema claro e escuro)
+# Cores por ação recomendada: só as do docs/DESIGN.md
 CORES_ACAO = {
-    "Promoção": "#D9961A",
-    "Doação": "#2F6FB3",
-    "Descarte": "#C8402B",
-    "Sem risco": "#8A948C",
+    "Promoção": "#F6D23C",   # etiqueta: olhe aqui
+    "Doação": "#2F6B3B",     # folha: ação
+    "Descarte": "#C8402B",   # tomate: problema
+    "Sem risco": "#D9DED6",  # linha
 }
 NOME_ACAO = {"promocao": "Promoção", "doacao": "Doação", "descartar": "Descarte", "ok": "Sem risco"}
 COR_VENDAS = "#2F6B3B"
@@ -117,14 +117,24 @@ def dados_top_desperdicio(relatorio: dict, n: int = 5) -> pd.DataFrame:
 
 # ------------------------------------------------------------------ gráficos
 
+FONTE = "Atkinson Hyperlegible"
+
+
 def _alt():
     import altair as alt  # dependência do Streamlit
     return alt
 
 
+def _tema(chart):
+    """Fonte e cores do docs/DESIGN.md nos eixos e legendas."""
+    return chart.configure(font=FONTE).configure_axis(
+        labelColor="#4F5E54", titleColor="#4F5E54", gridColor="#D9DED6", domainColor="#D9DED6", labelFontSize=13
+    ).configure_legend(labelColor="#1D2B22", titleColor="#4F5E54").configure_view(stroke=None)
+
+
 def grafico_perdas_por_categoria(df: pd.DataFrame):
     alt = _alt()
-    return (
+    return _tema((
         alt.Chart(df)
         .mark_bar(cornerRadiusEnd=4, color=COR_PERDAS)
         .encode(
@@ -133,7 +143,7 @@ def grafico_perdas_por_categoria(df: pd.DataFrame):
             tooltip=[alt.Tooltip("categoria:N", title="Categoria"), alt.Tooltip("valor_fmt:N", title="Perdas")],
         )
         .properties(height=max(160, 38 * len(df)))
-    )
+    ))
 
 
 def grafico_vendas_x_perdas(df: pd.DataFrame):
@@ -150,16 +160,16 @@ def grafico_vendas_x_perdas(df: pd.DataFrame):
     perdas = base.transform_filter(alt.datum.serie == "Perdas").mark_line(point=True, strokeDash=[4, 3]).encode(
         y=alt.Y("valor:Q", title="Perdas (R$)", axis=alt.Axis(titleColor=COR_PERDAS)))
     # eixos independentes: perdas são bem menores que vendas e sumiriam na mesma escala
-    return alt.layer(vendas, perdas).resolve_scale(y="independent").properties(height=300)
+    return _tema(alt.layer(vendas, perdas).resolve_scale(y="independent").properties(height=300))
 
 
 def grafico_lotes_em_risco(df: pd.DataFrame):
     alt = _alt()
     cores = alt.Scale(domain=list(CORES_ACAO), range=list(CORES_ACAO.values()))
     ordem = df["rotulo"].tolist()
-    return (
+    return _tema((
         alt.Chart(df)
-        .mark_bar(cornerRadiusEnd=4)
+        .mark_bar(cornerRadiusEnd=2, stroke="#1D2B22", strokeWidth=0.6)  # contorno: amarelo some no branco
         .encode(
             x=alt.X("perda:Q", title="Perda se nada for feito (R$, custo)"),
             y=alt.Y("rotulo:N", sort=ordem, title=None, axis=alt.Axis(labelLimit=320)),
@@ -168,7 +178,7 @@ def grafico_lotes_em_risco(df: pd.DataFrame):
                      alt.Tooltip("detalhe:N", title="Detalhe"), alt.Tooltip("perda_fmt:N", title="Perda sem ação")],
         )
         .properties(height=max(160, 34 * len(df)))
-    )
+    ))
 
 
 def grafico_top_desperdicio(df: pd.DataFrame):
@@ -185,4 +195,4 @@ def grafico_top_desperdicio(df: pd.DataFrame):
         )
     )
     rotulos = barras.mark_text(align="left", dx=4).encode(text="valor_fmt:N", color=alt.value("#888"))
-    return (barras + rotulos).properties(height=max(160, 38 * len(df)))
+    return _tema((barras + rotulos).properties(height=max(160, 38 * len(df))))

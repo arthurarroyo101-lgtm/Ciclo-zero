@@ -63,10 +63,11 @@ def passo_amigavel(texto: str) -> str:
 
 
 # ------------------------------------------------------------------ etiquetas e pedidos
-COR_TEXTO_ACAO = {"Promoção": "#8A5A06"}
+CLASSE_ACAO = {"Promoção": "promo", "Doação": "doacao", "Descarte": "descarte"}
 
-# Cada lote em risco vira uma etiqueta de preço de padaria: furo, ação na cor dela,
-# preço novo grande (ou quantidade a doar) e a validade como carimbo.
+# Plano por lote: bloco quieto (DESIGN.md reserva a "etiqueta de gôndola" ao topo e ao alerta de excesso).
+# A cor aparece só no selo da ação: amarelo = olhe aqui (promoção), verde = ação (doação), vermelho = problema.
+
 
 def _quando(dias: int) -> str:
     if dias < 0:
@@ -78,33 +79,28 @@ def _etiqueta_lote(lote: dict) -> str:
     from html import escape
 
     acao = NOME_ACAO.get(lote.get("acao"), lote.get("acao", ""))
-    cor = CORES_ACAO.get(acao, "#5F6B62")
-    texto = COR_TEXTO_ACAO.get(acao, cor)  # tom mais escuro para o texto ter contraste no branco
     u = escape(str(lote.get("unidade", "")))
-    produto = escape(str(lote.get("produto", "")))
     sobra = num(lote.get("sobra_projetada", 0))
     if acao == "Promoção":
-        novo = float(lote.get("preco_promocional", 0) or 0)
-        destaque = f"<div class='cz-preco'><span>{reais(novo)}</span></div>"
-        detalhe = f"{escape(str(lote.get('desconto_sugerido', '')))} de desconto em {sobra} {u}"
+        valor = reais(float(lote.get("preco_promocional", 0) or 0))
+        detalhe = f"{escape(str(lote.get('desconto_sugerido', '')))} de desconto nas {sobra} {u} que sobrariam."
         if lote.get("receita_recuperada_rs"):
-            detalhe += f", recupera {reais(lote['receita_recuperada_rs'])}"
+            detalhe += f" Recupera {reais(lote['receita_recuperada_rs'])}."
     elif acao == "Doação":
-        q = num(lote.get("quantidade_para_doar", lote.get("sobra_projetada", 0)))
-        destaque = f"<div class='cz-preco'><span>{q} {u}</span></div>"
-        detalhe = "Para banco de alimentos ou ONG parceira"
+        valor = f"{num(lote.get('quantidade_para_doar', lote.get('sobra_projetada', 0)))} {u}"
+        detalhe = "Doar para um banco de alimentos ou ONG parceira."
     else:
-        destaque = "<div class='cz-preco'><span>Retirar</span></div>"
-        detalhe = f"{sobra} {u} fora da venda"
+        valor = "Retirar"
+        detalhe = f"Tirar {sobra} {u} da venda."
     return (
-        f"<div class='cz-etiqueta' style='--cor:{cor};--cor-texto:{texto}'>"
-        f"<div class='cz-acao'>{escape(acao)}</div>"
-        f"<div class='cz-produto'>{produto}</div>"
-        f"{destaque}"
+        "<div class='cz-lote'>"
+        f"<div class='cz-lote-topo'><span class='cz-selo cz-{CLASSE_ACAO.get(acao, 'descarte')}'>{escape(acao)}</span>"
+        f"<span>{_quando(int(lote.get('dias_para_vencer', 0)))}</span></div>"
+        f"<div class='cz-produto'>{escape(str(lote.get('produto', '')))}</div>"
+        f"<div class='cz-valor'>{valor}</div>"
         f"<div class='cz-detalhe'>{detalhe}</div>"
-        f"<div class='cz-rodape'><span class='cz-carimbo'>{_quando(int(lote.get('dias_para_vencer', 0)))}</span>"
-        f"<span>sem ação, perde {reais(lote.get('perda_sem_acao_rs', 0))}</span></div>"
-        f"</div>"
+        f"<div class='cz-lixo'>Vai para o lixo: {reais(lote.get('perda_sem_acao_rs', 0))}</div>"
+        "</div>"
     )
 
 
@@ -117,9 +113,9 @@ def _bloco_pedido(p: dict) -> str:
     return (
         "<div class='cz-pedido'>"
         f"<div class='cz-pedido-topo'><b>{escape(str(p.get('fornecedor', '')))}</b>"
-        f"<span>Pedido {p.get('pedido_id', '?')}, rascunho</span></div>"
+        f"<span>Pedido {p.get('pedido_id', '?')}, esperando sua aprovação</span></div>"
         f"<ul>{linhas}</ul>"
-        f"<div class='cz-pedido-total'><span>Total estimado</span><b>{reais(p.get('valor_estimado', 0))}</b></div>"
+        f"<div class='cz-pedido-total'><span>A pagar</span><b>{reais(p.get('valor_estimado', 0))}</b></div>"
         "</div>"
     )
 
@@ -145,14 +141,14 @@ def render_plano(passos: list[dict]) -> None:
         r = risco.get("resumo", {})
         k1, k2, k3 = st.columns(3)
         k1.markdown("<span class='cz-neg'></span>", unsafe_allow_html=True)  # risco em vermelho
-        k1.metric("Perda se nada for feito", reais(r.get("perda_total_sem_acao_rs", 0)))
+        k1.metric("Vai para o lixo se nada for feito", reais(r.get("perda_total_sem_acao_rs", 0)))
         k2.metric("Recuperado com promoções", reais(r.get("receita_recuperada_com_promocoes_rs", 0)))
         k3.metric("Vai para doação, a preço de custo", reais(r.get("custo_dos_itens_para_doacao_rs", 0)))
         lotes = sorted(risco.get("lotes_em_risco", []), key=lambda x: (x.get("dias_para_vencer", 0),
                                                                         -x.get("perda_sem_acao_rs", 0)))
         if lotes:
             st.markdown("#### O que fazer com cada lote")
-            _grade([_etiqueta_lote(l) for l in lotes], "cz-etiquetas")
+            _grade([_etiqueta_lote(l) for l in lotes], "cz-lotes")
         else:
             st.success("Nenhum lote corre risco de vencer antes de ser vendido.")
 
@@ -171,120 +167,112 @@ def render_plano(passos: list[dict]) -> None:
 
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75,800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap');
+/* Sistema visual: docs/DESIGN.md (cores, fontes, escala 14/16/20/26/36, cantos 6/8px) */
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,700..900&family=Atkinson+Hyperlegible:wght@400;700&display=swap');
 
 :root {
-    --cz-folha: #2F6B3B;
-    --cz-folha-escura: #1F4D29;
-    --cz-tinta: #1D2B22;
-    --cz-risco: #C8402B;
-    --cz-etiqueta: #F6D23C;
-    --cz-sub: #5F6B62;
-    --cz-salvia: #EEF3EC;
-    --cz-fio: #D6DED3;
+    --tinta: #1D2B22;
+    --tinta-2: #4F5E54;
+    --folha: #2F6B3B;
+    --etiqueta: #F6D23C;
+    --tomate: #C8402B;
+    --papel: #EFE6D6;
+    --linha: #D9DED6;
+    --branco: #FFFFFF;
 }
 
-/* Uma família só, escolhida para leitura rápida (dono do comércio) e projetor (banca).
-   Não aplicar em span: os ícones do Streamlit usam uma fonte própria. */
+/* Texto: Atkinson Hyperlegible no app todo (não aplicar em span: ícones do Streamlit têm fonte própria) */
 html, body, .stApp, .stMarkdown, .stMarkdown p, .stMarkdown li, h1, h2, h3, h4, h5,
-label, button, input, textarea, [data-testid="stMetricValue"], [data-testid="stMetricLabel"],
-[data-testid="stCaptionContainer"], .stTabs button p {
-    font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif !important;
+label, button, input, textarea, [data-testid="stMetricLabel"], [data-testid="stCaptionContainer"],
+.stTabs button p {
+    font-family: "Atkinson Hyperlegible", system-ui, sans-serif !important;
 }
-.stApp { color: var(--cz-tinta); }
-h1, h2, h3, h4 { color: var(--cz-tinta); letter-spacing: -0.01em; }
-/* números dos indicadores: Archivo 800 condensada (lê de longe, cabe mais dígito) */
-[data-testid="stMetricValue"], [data-testid="stMetricValue"] div {
+.stApp { color: var(--tinta); background: var(--branco); font-size: 16px; }
+.stMarkdown p, .stMarkdown li { max-width: 75ch; }
+h3 { font-size: 26px !important; } h4 { font-size: 20px !important; } h5 { font-size: 16px !important; }
+h1, h2, h3, h4, h5 { color: var(--tinta) !important; }
+[data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p { color: var(--tinta-2) !important; font-size: 14px; }
+
+/* Valores em R$ e números grandes: Archivo 800 levemente condensada, algarismos tabulares */
+[data-testid="stMetricValue"], [data-testid="stMetricValue"] div, .cz-valor, .cz-pedido-total b, .cz-pedido li b {
     font-family: "Archivo", "Arial Narrow", sans-serif !important;
-    font-weight: 800 !important; font-stretch: 75%; font-variation-settings: "wdth" 75;
-    font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+    font-weight: 800 !important; font-stretch: 85%; font-variant-numeric: tabular-nums;
 }
-/* valores negativos e de risco: marcados no app.py com <span class="cz-neg"> na mesma coluna */
+[data-testid="stMetricValue"] { font-size: 36px !important; color: var(--tinta); }
+
+/* Vermelho só significa problema: valor negativo ou de risco (marcador .cz-neg na coluna, app.py) */
 [data-testid="stColumn"]:has(.cz-neg) [data-testid="stMetricValue"],
-[data-testid="column"]:has(.cz-neg) [data-testid="stMetricValue"] { color: var(--cz-risco) !important; }
+[data-testid="column"]:has(.cz-neg) [data-testid="stMetricValue"] { color: var(--tomate) !important; }
 .cz-neg { display: none; }
 
-/* alertas de compra em excesso (st.warning): amarelo de etiqueta de oferta */
+/* Amarelo só significa "olhe aqui": alerta de compra em excesso (st.warning) como etiqueta */
 [data-testid="stAlertContainer"]:has([data-testid="stAlertContentWarning"]),
 div[data-baseweb="notification"]:has([data-testid="stAlertContentWarning"]) {
-    background: var(--cz-etiqueta) !important; color: var(--cz-tinta) !important;
+    background: var(--etiqueta) !important; color: var(--tinta) !important; border-radius: 6px !important;
 }
-[data-testid="stAlertContentWarning"], [data-testid="stAlertContentWarning"] p { color: var(--cz-tinta) !important; }
+[data-testid="stAlertContentWarning"], [data-testid="stAlertContentWarning"] p { color: var(--tinta) !important; }
 
-/* botões primários em verde folha (o tema já define; reforço para versões antigas) */
+/* Verde é marca e ação: botões primários, aba ativa, foco */
+button { border-radius: 8px !important; }
 button[kind="primary"], [data-testid="stBaseButton-primary"] {
-    background: var(--cz-folha) !important; border-color: var(--cz-folha) !important; color: #FFFFFF !important;
+    background: var(--folha) !important; border-color: var(--folha) !important; color: var(--branco) !important;
 }
-button[kind="primary"]:hover, [data-testid="stBaseButton-primary"]:hover { background: var(--cz-folha-escura) !important; }
-
-/* sem sombras decorativas */
-[data-testid="stVerticalBlockBorderWrapper"] { box-shadow: none !important; }
-
-/* barra lateral em sálvia */
-[data-testid="stSidebar"] { background: var(--cz-salvia); border-right: 1px solid var(--cz-fio); }
-
-/* abas: a ativa em verde folha */
-.stTabs [aria-selected="true"] p { color: var(--cz-folha) !important; font-weight: 700; }
-
-/* foco de teclado sempre visível */
+.stTabs [aria-selected="true"] p { color: var(--folha) !important; font-weight: 700; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, [role="tab"]:focus-visible {
-    outline: 3px solid var(--cz-folha) !important; outline-offset: 2px;
+    outline: 3px solid var(--folha) !important; outline-offset: 2px;
 }
 
-/* caixa de mensagem do agente: o lugar onde o dono fala, então é a mais visível da tela */
+/* Quieto: sem sombra, sem cartão decorativo */
+[data-testid="stVerticalBlockBorderWrapper"] { box-shadow: none !important; border-color: var(--linha) !important; }
+[data-testid="stSidebar"] { background: var(--branco); border-right: 1px solid var(--linha); }
+
+/* Caixa de mensagem: onde o dono fala com o agente */
 [data-testid="stChatInput"] {
-    border: 2px solid var(--cz-folha) !important;
-    border-radius: 14px !important;
-    background: #FFFFFF !important;
-    padding: 4px 6px !important;
+    border: 2px solid var(--folha) !important; border-radius: 8px !important;
+    background: var(--branco) !important; padding: 4px 6px !important;
 }
-[data-testid="stChatInput"] textarea { font-size: 1.1rem !important; min-height: 3.2rem !important; }
-[data-testid="stChatInput"] textarea::placeholder { color: var(--cz-sub) !important; opacity: 1 !important; }
-[data-testid="stChatInput"]:focus-within { border-color: var(--cz-folha-escura) !important;
-    box-shadow: 0 0 0 4px rgba(47, 107, 58, .16) !important; }
-.cz-pergunta { font-size: 1.3rem; font-weight: 700; color: var(--cz-tinta); margin: .8rem 0 .1rem; }
+[data-testid="stChatInput"] textarea { font-size: 16px !important; min-height: 3.2rem !important; }
+[data-testid="stChatInput"] textarea::placeholder { color: var(--tinta-2) !important; opacity: 1 !important; }
+.cz-pergunta { font-size: 20px; font-weight: 700; color: var(--tinta); margin: .8rem 0 .1rem; }
 
-/* etiquetas de preço (plano de ação por lote) */
-.cz-etiquetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px;
-                margin: .4rem 0 1.2rem; }
-.cz-etiqueta { position: relative; background: #FFFFFF; border: 2px solid var(--cor);
-               border-radius: 6px 18px 18px 6px; padding: 14px 16px 12px 34px; color: var(--cz-tinta); }
-.cz-etiqueta::before { /* o furo da etiqueta */
-    content: ""; position: absolute; left: 12px; top: 22px; width: 10px; height: 10px; border-radius: 50%;
-    border: 2px solid var(--cor); background: var(--cz-salvia); }
-.cz-acao { color: var(--cor-texto, var(--cor)); font-weight: 700; font-size: .95rem; }
-.cz-produto { font-size: 1.1rem; font-weight: 700; line-height: 1.25; margin: 2px 0 6px; }
-.cz-preco { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.cz-preco span { font-size: 1.9rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.cz-detalhe { color: var(--cz-sub); font-size: .92rem; line-height: 1.4; margin-top: 4px; }
-.cz-rodape { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;
-             border-top: 1px dashed var(--cz-fio); margin-top: 10px; padding-top: 8px;
-             font-size: .85rem; color: var(--cz-sub); }
-.cz-carimbo { border: 1.5px solid var(--cor); color: var(--cor-texto, var(--cor)); border-radius: 4px; padding: 0 6px;
-              font-weight: 700; transform: rotate(-2deg); display: inline-block; }
+/* Plano por lote: blocos quietos, alinhados à esquerda; a cor vive só no selo da ação */
+.cz-lotes { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px;
+            margin: .4rem 0 1.2rem; }
+.cz-lote { background: var(--branco); border: 1px solid var(--linha); border-radius: 4px; padding: 12px 14px;
+           color: var(--tinta); }
+.cz-lote-topo { display: flex; justify-content: space-between; align-items: center; gap: 8px;
+                font-size: 14px; color: var(--tinta-2); }
+.cz-selo { border-radius: 6px; padding: 1px 8px; font-weight: 700; font-size: 14px; }
+.cz-promo { background: var(--etiqueta); color: var(--tinta); }
+.cz-doacao { background: var(--folha); color: var(--branco); }
+.cz-descarte { background: var(--tomate); color: var(--branco); }
+.cz-produto { font-size: 16px; font-weight: 700; margin: 8px 0 2px; }
+.cz-valor { font-size: 26px; line-height: 1.15; }
+.cz-detalhe { color: var(--tinta-2); font-size: 14px; line-height: 1.45; margin-top: 4px; }
+.cz-lixo { color: var(--tomate); font-size: 14px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--linha); }
 
-/* pedidos: quietos, como uma comanda */
-.cz-pedidos { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px;
+/* Pedidos: fundo de recibo (papel) */
+.cz-pedidos { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px;
               margin: .4rem 0 1rem; }
-.cz-pedido { background: #FFFFFF; border: 1px solid var(--cz-fio); border-radius: 10px; padding: 12px 14px; }
+.cz-pedido { background: var(--papel); border-radius: 4px; padding: 12px 14px; color: var(--tinta); }
 .cz-pedido-topo { display: flex; flex-direction: column; margin-bottom: 6px; }
-.cz-pedido-topo span { color: var(--cz-sub); font-size: .85rem; }
+.cz-pedido-topo span { color: var(--tinta-2); font-size: 14px; }
 .cz-pedido ul { list-style: none; margin: 0; padding: 0; }
-.cz-pedido li { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; font-size: .95rem; }
-.cz-pedido li b { font-variant-numeric: tabular-nums; }
-.cz-pedido-total { display: flex; justify-content: space-between; border-top: 1px solid var(--cz-fio);
-                   margin-top: 6px; padding-top: 6px; }
-.cz-pedido-total b { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.cz-pedido li { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
+.cz-pedido li b { font-weight: 700 !important; }
+.cz-pedido-total { display: flex; justify-content: space-between; align-items: baseline;
+                   border-top: 1px dashed var(--tinta-2); margin-top: 6px; padding-top: 6px; }
+.cz-pedido-total b { font-size: 20px; }
 
-/* barra lateral: boas-vindas, marca e o porquê */
-.cz-boasvindas { font-size: 1.05rem; line-height: 1.45; color: var(--cz-tinta); }
+/* Barra lateral: boas-vindas, marca e o porquê */
+.cz-boasvindas { font-size: 16px; line-height: 1.45; color: var(--tinta); }
 .cz-marca { display: flex; align-items: center; gap: .5rem; margin: .9rem 0 1rem; }
 .cz-marca img { width: 44px; height: 44px; object-fit: contain; }
-.cz-marca .cz-icone { font-size: 2.2rem; line-height: 1; }
-.cz-marca .cz-nome { font-size: 1.85rem; font-weight: 700; color: var(--cz-folha); letter-spacing: -.02em; }
-.cz-dor { border-top: 1px solid var(--cz-fio); padding-top: .8rem; margin-bottom: 1rem; }
-.cz-dor h4 { margin: 0 0 .35rem; font-size: 1.02rem; color: var(--cz-tinta); }
-.cz-dor p { margin: 0; font-size: .93rem; line-height: 1.5; color: var(--cz-sub); max-width: 34ch; }
+.cz-marca .cz-icone { font-size: 2rem; line-height: 1; }
+.cz-marca .cz-nome { font-size: 26px; font-weight: 700; color: var(--folha); }
+.cz-dor { border-top: 1px solid var(--linha); padding-top: .8rem; margin-bottom: 1rem; }
+.cz-dor h4 { margin: 0 0 .35rem; font-size: 16px !important; color: var(--tinta); }
+.cz-dor p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--tinta-2); }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
