@@ -12,14 +12,14 @@ import pandas as pd
 
 # Cores por ação recomendada (mesma leitura em tema claro e escuro)
 CORES_ACAO = {
-    "Promoção": "#E8A33D",
-    "Doação": "#3A86C8",
-    "Descarte": "#D64545",
-    "Sem risco": "#9AA0A6",
+    "Promoção": "#D9961A",
+    "Doação": "#2F6FB3",
+    "Descarte": "#C2362F",
+    "Sem risco": "#8A948C",
 }
 NOME_ACAO = {"promocao": "Promoção", "doacao": "Doação", "descartar": "Descarte", "ok": "Sem risco"}
-COR_VENDAS = "#2E7D32"
-COR_PERDAS = "#D64545"
+COR_VENDAS = "#2F6B3A"
+COR_PERDAS = "#C2362F"
 
 
 def reais(v: float) -> str:

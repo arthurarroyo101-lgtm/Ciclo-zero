@@ -117,8 +117,8 @@ with aba_chat:
                                         f"`{p['ferramenta']}({p['argumentos']})`")
                             st.json(p["resultado"], expanded=False)
         st.markdown("<div class='cz-pergunta'>💬 Qual a dúvida de hoje?</div>", unsafe_allow_html=True)
-        st.caption("Ex.: chegaram 30 litros de leite com validade 30/10/2026 · o que vence essa semana? · "
-                   "quanto devo pedir de leite?")
+        st.caption("Pode perguntar do seu jeito, por exemplo: “chegaram 30 litros de leite com validade "
+                   "30/10/2026”, “o que vence essa semana?” ou “quanto devo pedir de leite?”")
         if msg := st.chat_input("Qual a dúvida de hoje?"):
             st.session_state.chat.append(("user", msg))
             with st.status("O agente está trabalhando...", expanded=True) as status:

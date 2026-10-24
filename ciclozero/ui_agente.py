@@ -62,49 +62,71 @@ def passo_amigavel(texto: str) -> str:
     return texto  # trocas de modelo/provedor: mantém o aviso original (mostra a robustez)
 
 
-# ------------------------------------------------------------------ cartões
+# ------------------------------------------------------------------ etiquetas e pedidos
+COR_TEXTO_ACAO = {"Promoção": "#8A5A06"}
 
-def _selo(acao: str, cor: str | None = None) -> str:
-    cor = cor or CORES_ACAO.get(acao, "#9AA0A6")
-    return (f"<span style='background:{cor};color:#fff;padding:2px 10px;border-radius:999px;"
-            f"font-size:0.78rem;font-weight:600;letter-spacing:.02em'>{acao}</span>")
-
+# Cada lote em risco vira uma etiqueta de preço de padaria: furo, ação na cor dela,
+# preço novo grande (ou quantidade a doar) e a validade como carimbo.
 
 def _quando(dias: int) -> str:
     if dias < 0:
-        return "já vencido"
-    return {0: "vence hoje", 1: "vence amanhã"}.get(dias, f"vence em {dias} dias")
+        return "Já vencido"
+    return {0: "Vence hoje", 1: "Vence amanhã"}.get(dias, f"Vence em {dias} dias")
 
 
-def _cartao_lote(lote: dict) -> None:
+def _etiqueta_lote(lote: dict) -> str:
+    from html import escape
+
     acao = NOME_ACAO.get(lote.get("acao"), lote.get("acao", ""))
-    u = lote.get("unidade", "")
-    with st.container(border=True):
-        st.markdown(f"{_selo(acao)}&nbsp;&nbsp;<b>{lote.get('produto', '')}</b>", unsafe_allow_html=True)
-        st.caption(f"{_quando(int(lote.get('dias_para_vencer', 0)))} · "
-                   f"sobra prevista {num(lote.get('sobra_projetada', 0))} {u}")
-        if acao == "Promoção":
-            st.markdown(f"**{lote.get('desconto_sugerido', '')} de desconto** → "
-                        f"{reais(lote.get('preco_promocional', 0))}")
-            if lote.get("receita_recuperada_rs"):
-                st.caption(f"recupera {reais(lote['receita_recuperada_rs'])} em vendas")
-        elif acao == "Doação":
-            st.markdown(f"**Doar {num(lote.get('quantidade_para_doar', lote.get('sobra_projetada', 0)))} {u}**")
-            st.caption("banco de alimentos ou ONG parceira")
-        elif acao == "Descarte":
-            st.markdown("**Retirar da venda e descartar**")
-        st.caption(f"perda se nada for feito: {reais(lote.get('perda_sem_acao_rs', 0))}")
+    cor = CORES_ACAO.get(acao, "#5F6B62")
+    texto = COR_TEXTO_ACAO.get(acao, cor)  # tom mais escuro para o texto ter contraste no branco
+    u = escape(str(lote.get("unidade", "")))
+    produto = escape(str(lote.get("produto", "")))
+    sobra = num(lote.get("sobra_projetada", 0))
+    if acao == "Promoção":
+        novo = float(lote.get("preco_promocional", 0) or 0)
+        destaque = f"<div class='cz-preco'><span>{reais(novo)}</span></div>"
+        detalhe = f"{escape(str(lote.get('desconto_sugerido', '')))} de desconto em {sobra} {u}"
+        if lote.get("receita_recuperada_rs"):
+            detalhe += f", recupera {reais(lote['receita_recuperada_rs'])}"
+    elif acao == "Doação":
+        q = num(lote.get("quantidade_para_doar", lote.get("sobra_projetada", 0)))
+        destaque = f"<div class='cz-preco'><span>{q} {u}</span></div>"
+        detalhe = "Para banco de alimentos ou ONG parceira"
+    else:
+        destaque = "<div class='cz-preco'><span>Retirar</span></div>"
+        detalhe = f"{sobra} {u} fora da venda"
+    return (
+        f"<div class='cz-etiqueta' style='--cor:{cor};--cor-texto:{texto}'>"
+        f"<div class='cz-acao'>{escape(acao)}</div>"
+        f"<div class='cz-produto'>{produto}</div>"
+        f"{destaque}"
+        f"<div class='cz-detalhe'>{detalhe}</div>"
+        f"<div class='cz-rodape'><span class='cz-carimbo'>{_quando(int(lote.get('dias_para_vencer', 0)))}</span>"
+        f"<span>sem ação, perde {reais(lote.get('perda_sem_acao_rs', 0))}</span></div>"
+        f"</div>"
+    )
 
 
-def _cartao_pedido(p: dict) -> None:
-    with st.container(border=True):
-        st.markdown(f"{_selo('Rascunho', '#5F6368')}&nbsp;&nbsp;<b>Pedido #{p.get('pedido_id', '?')}</b>",
-                    unsafe_allow_html=True)
-        st.markdown(f"**{p.get('fornecedor', '')}** · {reais(p.get('valor_estimado', 0))}")
-        itens = p.get("itens") or []
-        if itens:
-            st.caption(" · ".join(f"{i.get('produto')}: {num(i.get('quantidade', 0))}" for i in itens))
-        st.caption("aguardando sua aprovação na aba 🧾 Pedidos")
+def _bloco_pedido(p: dict) -> str:
+    from html import escape
+
+    itens = p.get("itens") or []
+    linhas = "".join(
+        f"<li><span>{escape(str(i.get('produto', '')))}</span><b>{num(i.get('quantidade', 0))}</b></li>" for i in itens)
+    return (
+        "<div class='cz-pedido'>"
+        f"<div class='cz-pedido-topo'><b>{escape(str(p.get('fornecedor', '')))}</b>"
+        f"<span>Pedido {p.get('pedido_id', '?')}, rascunho</span></div>"
+        f"<ul>{linhas}</ul>"
+        f"<div class='cz-pedido-total'><span>Total estimado</span><b>{reais(p.get('valor_estimado', 0))}</b></div>"
+        "</div>"
+    )
+
+
+def _grade(blocos: list[str], classe: str) -> None:
+    html = "".join(blocos).replace("R$ ", "R$&nbsp;")  # "R$" nunca se separa do valor na quebra de linha
+    st.markdown(f"<div class='{classe}'>{html}</div>", unsafe_allow_html=True)
 
 
 def tem_plano(passos: list[dict]) -> bool:
@@ -124,26 +146,22 @@ def render_plano(passos: list[dict]) -> None:
         k1, k2, k3 = st.columns(3)
         k1.metric("Perda se nada for feito", reais(r.get("perda_total_sem_acao_rs", 0)))
         k2.metric("Recuperado com promoções", reais(r.get("receita_recuperada_com_promocoes_rs", 0)))
-        k3.metric("Vai para doação (custo)", reais(r.get("custo_dos_itens_para_doacao_rs", 0)))
+        k3.metric("Vai para doação, a preço de custo", reais(r.get("custo_dos_itens_para_doacao_rs", 0)))
         lotes = sorted(risco.get("lotes_em_risco", []), key=lambda x: (x.get("dias_para_vencer", 0),
                                                                         -x.get("perda_sem_acao_rs", 0)))
         if lotes:
-            st.markdown("##### Plano de ação por lote")
-            for i in range(0, len(lotes), 3):
-                for col, lote in zip(st.columns(3), lotes[i:i + 3]):
-                    with col:
-                        _cartao_lote(lote)
+            st.markdown("#### O que fazer com cada lote")
+            _grade([_etiqueta_lote(l) for l in lotes], "cz-etiquetas")
         else:
-            st.success("Nenhum lote em risco nos próximos dias.")
+            st.success("Nenhum lote corre risco de vencer antes de ser vendido.")
 
     if pedidos:
         criados = [p for p in pedidos.get("pedidos", []) if p.get("ok")]
         if criados:
-            st.markdown(f"##### Pedidos de compra · {reais(pedidos.get('valor_total_rs', 0))} no total")
-            for i in range(0, len(criados), 3):
-                for col, p in zip(st.columns(3), criados[i:i + 3]):
-                    with col:
-                        _cartao_pedido(p)
+            st.markdown("#### Pedidos de compra prontos para você aprovar")
+            st.caption(f"{len(criados)} fornecedor(es), {reais(pedidos.get('valor_total_rs', 0))} no total. "
+                       "Nada é comprado sem a sua aprovação na aba Pedidos.")
+            _grade([_bloco_pedido(p) for p in criados], "cz-pedidos")
         else:
             st.info("Nenhuma reposição necessária agora.")
 
@@ -152,33 +170,95 @@ def render_plano(passos: list[dict]) -> None:
 
 CSS = """
 <style>
-/* caixa de mensagem do agente: maior, com borda verde e sombra para chamar atenção */
+@import url('https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap');
+
+:root {
+    --cz-folha: #2F6B3A;
+    --cz-folha-escura: #1F4D29;
+    --cz-tinta: #1F2A22;
+    --cz-sub: #5F6B62;
+    --cz-salvia: #EEF3EC;
+    --cz-fio: #D6DED3;
+}
+
+/* Uma família só, escolhida para leitura rápida (dono do comércio) e projetor (banca).
+   Não aplicar em span: os ícones do Streamlit usam uma fonte própria. */
+html, body, .stApp, .stMarkdown, .stMarkdown p, .stMarkdown li, h1, h2, h3, h4, h5,
+label, button, input, textarea, [data-testid="stMetricValue"], [data-testid="stMetricLabel"],
+[data-testid="stCaptionContainer"], .stTabs button p {
+    font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif !important;
+}
+.stApp { color: var(--cz-tinta); }
+h1, h2, h3, h4 { color: var(--cz-tinta); letter-spacing: -0.01em; }
+[data-testid="stMetricValue"] { font-variant-numeric: tabular-nums; font-weight: 700; }
+
+/* barra lateral em sálvia */
+[data-testid="stSidebar"] { background: var(--cz-salvia); border-right: 1px solid var(--cz-fio); }
+
+/* abas: a ativa em verde folha */
+.stTabs [aria-selected="true"] p { color: var(--cz-folha) !important; font-weight: 700; }
+
+/* foco de teclado sempre visível */
+button:focus-visible, input:focus-visible, textarea:focus-visible, [role="tab"]:focus-visible {
+    outline: 3px solid var(--cz-folha) !important; outline-offset: 2px;
+}
+
+/* caixa de mensagem do agente: o lugar onde o dono fala, então é a mais visível da tela */
 [data-testid="stChatInput"] {
-    border: 2px solid #2E7D32 !important;
-    border-radius: 16px !important;
-    box-shadow: 0 6px 22px rgba(46, 125, 50, .18) !important;
+    border: 2px solid var(--cz-folha) !important;
+    border-radius: 14px !important;
     background: #FFFFFF !important;
     padding: 4px 6px !important;
 }
-[data-testid="stChatInput"] textarea {
-    font-size: 1.08rem !important;
-    min-height: 3.2rem !important;
-}
-[data-testid="stChatInput"] textarea::placeholder { color: #5F7F61 !important; opacity: 1 !important; }
-[data-testid="stChatInput"]:focus-within { box-shadow: 0 6px 26px rgba(46, 125, 50, .32) !important; }
-.cz-pergunta { font-size: 1.15rem; font-weight: 700; color: #1B5E20; margin: .6rem 0 .25rem; }
+[data-testid="stChatInput"] textarea { font-size: 1.1rem !important; min-height: 3.2rem !important; }
+[data-testid="stChatInput"] textarea::placeholder { color: var(--cz-sub) !important; opacity: 1 !important; }
+[data-testid="stChatInput"]:focus-within { border-color: var(--cz-folha-escura) !important;
+    box-shadow: 0 0 0 4px rgba(47, 107, 58, .16) !important; }
+.cz-pergunta { font-size: 1.3rem; font-weight: 700; color: var(--cz-tinta); margin: .8rem 0 .1rem; }
 
-/* barra lateral */
-.cz-boasvindas { font-size: 1.05rem; line-height: 1.45; margin-bottom: .2rem; }
-.cz-boasvindas b { color: #1B5E20; }
-.cz-marca { display: flex; align-items: center; gap: .55rem; margin: .6rem 0 .9rem; }
+/* etiquetas de preço (plano de ação por lote) */
+.cz-etiquetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px;
+                margin: .4rem 0 1.2rem; }
+.cz-etiqueta { position: relative; background: #FFFFFF; border: 2px solid var(--cor);
+               border-radius: 6px 18px 18px 6px; padding: 14px 16px 12px 34px; color: var(--cz-tinta); }
+.cz-etiqueta::before { /* o furo da etiqueta */
+    content: ""; position: absolute; left: 12px; top: 22px; width: 10px; height: 10px; border-radius: 50%;
+    border: 2px solid var(--cor); background: var(--cz-salvia); }
+.cz-acao { color: var(--cor-texto, var(--cor)); font-weight: 700; font-size: .95rem; }
+.cz-produto { font-size: 1.1rem; font-weight: 700; line-height: 1.25; margin: 2px 0 6px; }
+.cz-preco { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.cz-preco span { font-size: 1.9rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.cz-detalhe { color: var(--cz-sub); font-size: .92rem; line-height: 1.4; margin-top: 4px; }
+.cz-rodape { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;
+             border-top: 1px dashed var(--cz-fio); margin-top: 10px; padding-top: 8px;
+             font-size: .85rem; color: var(--cz-sub); }
+.cz-carimbo { border: 1.5px solid var(--cor); color: var(--cor-texto, var(--cor)); border-radius: 4px; padding: 0 6px;
+              font-weight: 700; transform: rotate(-2deg); display: inline-block; }
+
+/* pedidos: quietos, como uma comanda */
+.cz-pedidos { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px;
+              margin: .4rem 0 1rem; }
+.cz-pedido { background: #FFFFFF; border: 1px solid var(--cz-fio); border-radius: 10px; padding: 12px 14px; }
+.cz-pedido-topo { display: flex; flex-direction: column; margin-bottom: 6px; }
+.cz-pedido-topo span { color: var(--cz-sub); font-size: .85rem; }
+.cz-pedido ul { list-style: none; margin: 0; padding: 0; }
+.cz-pedido li { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; font-size: .95rem; }
+.cz-pedido li b { font-variant-numeric: tabular-nums; }
+.cz-pedido-total { display: flex; justify-content: space-between; border-top: 1px solid var(--cz-fio);
+                   margin-top: 6px; padding-top: 6px; }
+.cz-pedido-total b { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+
+/* barra lateral: boas-vindas, marca e o porquê */
+.cz-boasvindas { font-size: 1.05rem; line-height: 1.45; color: var(--cz-tinta); }
+.cz-marca { display: flex; align-items: center; gap: .5rem; margin: .9rem 0 1rem; }
 .cz-marca img { width: 44px; height: 44px; object-fit: contain; }
-.cz-marca .cz-icone { font-size: 2.3rem; line-height: 1; }
-.cz-marca .cz-nome { font-size: 1.7rem; font-weight: 800; color: #1B5E20; letter-spacing: -.01em; }
-.cz-dor { background: #F1F8F1; border-left: 4px solid #2E7D32; border-radius: 10px;
-          padding: .8rem .9rem; margin-bottom: 1rem; }
-.cz-dor h4 { margin: 0 0 .35rem; font-size: 1rem; color: #1B5E20; }
-.cz-dor p { margin: 0; font-size: .9rem; line-height: 1.45; color: #2F3B30; }
+.cz-marca .cz-icone { font-size: 2.2rem; line-height: 1; }
+.cz-marca .cz-nome { font-size: 1.85rem; font-weight: 700; color: var(--cz-folha); letter-spacing: -.02em; }
+.cz-dor { border-top: 1px solid var(--cz-fio); padding-top: .8rem; margin-bottom: 1rem; }
+.cz-dor h4 { margin: 0 0 .35rem; font-size: 1.02rem; color: var(--cz-tinta); }
+.cz-dor p { margin: 0; font-size: .93rem; line-height: 1.5; color: var(--cz-sub); max-width: 34ch; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 """
 

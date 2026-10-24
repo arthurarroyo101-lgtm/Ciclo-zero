@@ -1,7 +1,11 @@
 [theme]
 base = "light"  # tema claro fixo: mais legível no projetor e combina com os cartões ao vivo
-# verde do Ciclo Zero; o resto acompanha o tema claro/escuro do navegador
-primaryColor = "#2E7D32"
+primaryColor = "#2F6B3A"          # verde folha do Ciclo Zero
+textColor = "#1F2A22"             # tinta esverdeada, mesma do CSS (ciclozero/ui_agente.py)
+secondaryBackgroundColor = "#EEF3EC"  # sálvia: barra lateral e campos
+
+[client]
+toolbarMode = "minimal"  # esconde "Implantar" e o menu de desenvolvedor na demo
 
 [browser]
 gatherUsageStats = false
