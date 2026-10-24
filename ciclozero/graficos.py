@@ -14,12 +14,12 @@ import pandas as pd
 CORES_ACAO = {
     "Promoção": "#D9961A",
     "Doação": "#2F6FB3",
-    "Descarte": "#C2362F",
+    "Descarte": "#C8402B",
     "Sem risco": "#8A948C",
 }
 NOME_ACAO = {"promocao": "Promoção", "doacao": "Doação", "descartar": "Descarte", "ok": "Sem risco"}
-COR_VENDAS = "#2F6B3A"
-COR_PERDAS = "#C2362F"
+COR_VENDAS = "#2F6B3B"
+COR_PERDAS = "#C8402B"
 
 
 def reais(v: float) -> str:

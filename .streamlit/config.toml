@@ -1,7 +1,7 @@
 [theme]
 base = "light"  # tema claro fixo: mais legível no projetor e combina com os cartões ao vivo
-primaryColor = "#2F6B3A"          # verde folha do Ciclo Zero
-textColor = "#1F2A22"             # tinta esverdeada, mesma do CSS (ciclozero/ui_agente.py)
+primaryColor = "#2F6B3B"          # verde folha do Ciclo Zero
+textColor = "#1D2B22"             # tinta esverdeada, mesma do CSS (ciclozero/ui_agente.py)
 secondaryBackgroundColor = "#EEF3EC"  # sálvia: barra lateral e campos
 
 [client]
