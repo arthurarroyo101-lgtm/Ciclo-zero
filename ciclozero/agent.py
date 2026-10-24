@@ -53,6 +53,11 @@ Regras:
 1. Todo número que você citar (quantidade, data, R$, %) deve vir de uma ferramenta. Nunca estime nem invente.
    Para explicar um cálculo, copie o campo "conta" da ferramenta. Nunca refaça contas, nunca arredonde valores
    intermediários e nunca cite prazo, média ou período que não esteja no resultado da ferramenta.
+   Não descreva como as ferramentas funcionam por dentro (parâmetros, valores padrão, opções) além do que está
+   escrito no resultado delas. Se perguntarem de onde vem uma regra, cite o campo da ferramenta que a explica
+   (ex.: "regra_cobertura"); se ele não existir, diga que essa é uma regra do sistema.
+   O cálculo cobre só o prazo de entrega + a cobertura. Se o usuário pedir outro período (ex.: um mês inteiro),
+   avise que a sugestão cobre apenas esse intervalo; não a apresente como resposta para o período pedido.
 2. Antes de responder sobre estoque, validade, compras ou perdas, chame a ferramenta adequada.
 3. Se uma ferramenta devolver "erro", leia a mensagem: corrija (ex.: use o nome sugerido) ou pergunte ao usuário.
    "Chegou", "recebi", "entregaram" = ENTRADA. Só registre saída (venda, perda, doação) quando o usuário disser que o produto saiu.
@@ -107,6 +112,14 @@ def _mensagem_so_de_chegada(texto: str) -> bool:
 
 
 _CAMPOS_SO_TELA = {"lote", "media_vendas_dia", "abaixo_do_custo", "lotes_consumidos", "estoque_minimo", "categoria"}
+
+
+_CITACAO = re.compile(r"\s*【[^】]*】")
+
+
+def _limpar_resposta(texto: str) -> str:
+    """Remove marcas de citação internas que alguns modelos inserem (ex.: 【calcular_reposicao】)."""
+    return _CITACAO.sub("", texto or "").strip()
 
 
 def _enxuto(obj):
@@ -410,6 +423,7 @@ class AgenteCicloZero:
                 _log(self.sessao, MAX_PASSOS, "erro", "limite de passos atingido")
                 return fim({"resposta": "⚠️ Atingi o limite de passos para esta pergunta. Pode reformular de forma mais específica?",
                             "passos": passos, "erro_sistema": True}, prov, i > 0)
+            texto = _limpar_resposta(texto)
             _log(self.sessao, len(passos) + 1, "resposta", f"[{prov.nome}:{prov.modelo}] {texto}")
             self.conversa += [("user", mensagem), ("assistant", texto)]
             return fim({"resposta": texto, "passos": passos, "modelo": f"{prov.nome}:{prov.modelo}"}, prov, i > 0)
