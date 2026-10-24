@@ -2,7 +2,7 @@
 
 **Agentes de IA contra o desperdício de alimentos**
 
-**Status:** Versão proposta para revisão — ainda não publicada no repositório.
+**Status:** versão entregue no AKCIT Camp 2026 (24/10/2026). Os pontos marcados como hipótese serão validados no piloto.
 
 ## 1. Segmentos de clientes
 

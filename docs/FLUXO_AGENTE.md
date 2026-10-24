@@ -65,6 +65,20 @@ foto da nota ──► modelo de visão (Gemini)  |  reserva: OCR local (Tessera
 
 **Exemplo — rotina diária (2 passos, ~25 s):** `analisar_risco_desperdicio` + `criar_pedidos_sugeridos` (em paralelo) → resposta com plano por lote, pedidos criados e resumo (perda sem ação, receita recuperada com promoções, valor doado).
 
+## Saídas (o que o dono recebe)
+| Saída | Onde aparece | De onde vem |
+|---|---|---|
+| **Plano por lote**: promoção com preço, doação ou descarte, e quanto vai para o lixo se nada for feito | Agente (rotina diária) e Dashboard | `analisar_risco_desperdicio` |
+| **Pedidos de compra** por fornecedor, só o necessário, como rascunho | Pedidos (o dono aprova ou recusa) | `criar_pedidos_sugeridos` / `calcular_reposicao` |
+| **Mensagem pronta para o fornecedor** (WhatsApp) | Pedidos, depois de aprovar | `ciclozero/mensagens.py`, com as quantidades do pedido aprovado |
+| **Plaquinhas de oferta** para imprimir | Estoque | Preço promocional do plano por lote |
+| **Alerta de compra/produção acima do que a loja vende** | Notificação na tela (some em ~12 s) e aba Alertas do dia | Comparação entre a entrada, a média de vendas e a validade (`ciclozero/ao_vivo.py`) |
+| **Respostas em português** com o número certo e a lei citada | Agente (chat) | Ferramentas + base normativa |
+
+Nenhuma saída executa compra ou emite documento sozinha: tudo passa pelo dono.
+
+**Relógio da loja** (`ciclozero/relogio.py`): todas as datas do sistema ("hoje", validade, caixa do dia) vêm de um único relógio. Com a Loja ao vivo (simulação), o dia anda acelerado das 7h às 20h. No fechamento, o resumo é guardado, os contadores zeram e os lotes vencidos viram perda.
+
 ## De onde vêm os fatos (RAG)
 - **Números** (estoque, vendas, R$, validades): do banco SQLite, via ferramentas — nunca do modelo.
 - **Regras legais** (pode doar? pode vender vencido?): da base normativa `docs/NORMAS.md`, com trechos conferidos no site oficial, citados com lei, artigo e link. Pergunta fora da base → "não sei; consulte a vigilância sanitária ou um advogado". Testado nos casos C14–C16 (inclusive pergunta fora da base, que reprova se o agente citar qualquer lei que não esteja na base).
