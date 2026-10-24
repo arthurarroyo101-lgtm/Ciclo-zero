@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ciclo Zero</title>
+<meta name="description" content="Agente de IA que controla o estoque de padarias e mercadinhos e evita que comida vire lixo.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+  /* Layout: página de balcão — texto à esquerda como lista de conferência; a etiqueta de gôndola é o único elemento ousado.
+     Tema claro único, de propósito (o mesmo do app e do projetor). */
+  :root {
+    --tinta: #1D2B22;      /* texto */
+    --tinta-2: #4F5E54;    /* texto secundário */
+    --folha: #2F6B3B;      /* marca e ação */
+    --etiqueta: #F6D23C;   /* só a etiqueta em destaque */
+    --etiqueta-borda: #C9A616;
+    --tomate: #C8402B;     /* só risco */
+    --papel: #EFE6D6;      /* papel de pão: notas e recibos */
+    --linha: #D9DED6;
+    --fundo: #FFFFFF;
+    --display: "Archivo", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+    --texto: "Atkinson Hyperlegible", "Segoe UI", Verdana, sans-serif;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--fundo); color: var(--tinta); font-family: var(--texto); font-size: 17px; line-height: 1.55; }
+  .faixa { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .miolo { max-width: 1080px; margin: 0 auto; }
+  a { color: var(--folha); }
+  a:focus-visible, button:focus-visible { outline: 3px solid var(--folha); outline-offset: 3px; border-radius: 4px; }
+  h1, h2, h3 { font-family: var(--display); color: var(--tinta); text-wrap: balance; margin: 0; }
+  h2 { font-weight: 800; font-stretch: 90%; font-size: clamp(28px, 4vw, 40px); line-height: 1.1; letter-spacing: -.01em; }
+  h3 { font-weight: 700; font-size: 20px; line-height: 1.25; }
+  p { margin: 0; max-width: 62ch; }
+  .sub { color: var(--tinta-2); }
+  section { padding-block: clamp(48px, 7vw, 88px); }
+  section + section { border-top: 1px solid var(--linha); }
+
+  /* topo */
+  .barra { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 18px; }
+  .marca { font-family: var(--display); font-weight: 900; font-stretch: 85%; font-size: 24px; color: var(--folha); letter-spacing: -.01em; text-decoration: none; }
+  .barra nav { display: flex; gap: 20px; font-size: 15px; }
+  .barra nav a { color: var(--tinta-2); text-decoration: none; }
+  .barra nav a:hover { color: var(--tinta); text-decoration: underline; }
+
+  /* hero */
+  .hero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: clamp(28px, 5vw, 64px); align-items: center;
+          padding-block: clamp(28px, 5vw, 64px) clamp(48px, 7vw, 88px); }
+  .hero h1 { font-weight: 900; font-stretch: 80%; font-size: clamp(42px, 7.2vw, 88px); line-height: .98; letter-spacing: -.02em; }
+  .hero .lead { font-size: clamp(18px, 2vw, 21px); margin-top: 22px; color: var(--tinta-2); }
+  .acoes { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+  .btn { display: inline-flex; align-items: center; min-height: 48px; padding: 0 22px; border-radius: 8px; font-weight: 700;
+         font-size: 17px; text-decoration: none; border: 2px solid var(--folha); }
+  .btn.cheio { background: var(--folha); color: #fff; }
+  .btn.vazio { background: transparent; color: var(--folha); }
+  .btn.cheio:hover { background: #255830; border-color: #255830; }
+
+  /* a etiqueta de gôndola */
+  .gondola { position: relative; justify-self: center; width: min(100%, 380px); }
+  .trilho { height: 14px; background: #C9CEC7; border-radius: 3px 3px 0 0; }
+  .etiqueta { position: relative; background: var(--etiqueta); border: 2px solid var(--etiqueta-borda); border-top: 0;
+              border-radius: 0 0 10px 10px; padding: 20px 24px 22px; transform-origin: top center; }
+  .etiqueta::after { content: ""; position: absolute; right: 18px; top: 16px; width: 12px; height: 12px; border-radius: 50%;
+                     background: var(--fundo); border: 2px solid var(--etiqueta-borda); }
+  .etiqueta .produto { font-weight: 700; font-size: 16px; }
+  .etiqueta .detalhe { font-size: 14px; color: #3B3A1F; margin-top: 2px; }
+  .preco { font-family: var(--display); font-weight: 900; font-stretch: 80%; font-variant-numeric: tabular-nums;
+           font-size: clamp(64px, 10vw, 104px); line-height: .95; margin-top: 14px; letter-spacing: -.02em; white-space: nowrap; }
+  .preco .rs { font-size: .32em; font-weight: 800; vertical-align: 1.35em; margin-right: 4px; letter-spacing: 0; }
+  .preco .cent { font-size: .45em; vertical-align: .95em; letter-spacing: 0; }
+  .etiqueta .rodape { display: flex; justify-content: space-between; gap: 12px; border-top: 1.5px dashed #9E8A18;
+                      margin-top: 14px; padding-top: 10px; font-size: 14px; }
+  .legenda-hero { font-size: 13px; color: var(--tinta-2); margin-top: 10px; text-align: center; }
+  @keyframes balanca { 0% { transform: rotate(-4deg); } 55% { transform: rotate(1.6deg); } 100% { transform: rotate(0); } }
+  @media (prefers-reduced-motion: no-preference) { .etiqueta { animation: balanca 1.1s cubic-bezier(.3,.7,.3,1) .25s both; } }
+
+  /* dor */
+  .dor { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(28px, 5vw, 64px); align-items: start; }
+  blockquote { margin: 18px 0 0; padding: 20px 22px; background: var(--papel); border-radius: 6px; font-size: 20px; line-height: 1.45; }
+  blockquote footer { font-size: 14px; color: var(--tinta-2); margin-top: 10px; }
+  .numeros { display: grid; gap: 18px; }
+  .numero { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: baseline; padding-bottom: 16px; border-bottom: 1px solid var(--linha); }
+  .numero b { font-family: var(--display); font-weight: 900; font-stretch: 80%; font-size: clamp(36px, 5vw, 52px); color: var(--tomate); font-variant-numeric: tabular-nums; line-height: 1; }
+  .fonte { font-size: 13px; color: var(--tinta-2); }
+
+  /* como funciona: é uma sequência de verdade */
+  .passos { list-style: none; padding: 0; margin: 32px 0 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; counter-reset: passo; }
+  .passos li { counter-increment: passo; padding: 18px 20px 4px 0; border-top: 3px solid var(--tinta); margin-right: 20px; }
+  .passos li::before { content: counter(passo); font-family: var(--display); font-weight: 900; font-size: 15px; color: var(--folha); display: block; margin-bottom: 6px; }
+  .passos p { font-size: 16px; color: var(--tinta-2); margin-top: 6px; }
+
+  /* recibo do agente */
+  .recibo-bloco { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: clamp(28px, 5vw, 64px); align-items: center; }
+  .recibo { background: var(--papel); border-radius: 6px; padding: 22px 24px; font-size: 16px; position: relative;
+            -webkit-mask: radial-gradient(circle 7px at 50% 100%, transparent 6.5px, #000 7px) 0 0 / 18px 100% repeat-x;
+            mask: radial-gradient(circle 7px at 50% 100%, transparent 6.5px, #000 7px) 0 0 / 18px 100% repeat-x;
+            padding-bottom: 34px; }
+  .recibo h3 { font-size: 17px; }
+  .recibo .hora { font-size: 13px; color: var(--tinta-2); }
+  .linha-r { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 9px 0; border-bottom: 1px dashed #BFAF92; }
+  .linha-r:last-child { border-bottom: 0; }
+  .linha-r span:last-child { font-family: var(--display); font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tag-acao { display: inline-block; font-size: 13px; font-weight: 700; padding: 1px 8px; border-radius: 4px; margin-left: 6px; vertical-align: 1px; }
+  .promo { background: var(--etiqueta); color: var(--tinta); }
+  .doa { background: #DCEADF; color: var(--folha); }
+  .lista-ok { list-style: none; padding: 0; margin: 22px 0 0; display: grid; gap: 14px; }
+  .lista-ok li { padding-left: 26px; position: relative; }
+  .lista-ok li::before { content: ""; position: absolute; left: 2px; top: .55em; width: 10px; height: 10px; border-radius: 2px; background: var(--folha); }
+
+  /* confiança */
+  .confianca { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; margin-top: 30px; }
+  .confianca p { font-size: 16px; color: var(--tinta-2); margin-top: 8px; }
+  .lei { font-weight: 700; color: var(--tinta); }
+
+  /* para quem */
+  .quem { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; margin-top: 26px; }
+  .quem div { padding: 20px 22px; border: 1.5px solid var(--linha); border-radius: 6px; }
+  .quem .sim { border-color: var(--folha); }
+  .quem ul { margin: 10px 0 0; padding-left: 20px; }
+
+  /* fechamento */
+  .fecho { background: var(--folha); color: #fff; }
+  .fecho h2, .fecho p { color: #fff; }
+  .fecho .sub { color: #DCEADF; }
+  .fecho .btn.cheio { background: var(--etiqueta); color: var(--tinta); border-color: var(--etiqueta); }
+  .fecho .btn.vazio { color: #fff; border-color: #fff; }
+  .fecho a:focus-visible { outline-color: var(--etiqueta); }
+  footer.rodape { padding-block: 26px; font-size: 14px; color: var(--tinta-2); display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+
+  @media (max-width: 860px) {
+    .hero, .dor, .recibo-bloco, .quem { grid-template-columns: minmax(0, 1fr); }
+    .gondola { order: -1; }
+    .passos { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 18px; }
+    .confianca { grid-template-columns: minmax(0, 1fr); }
+    .barra nav { display: none; }
+  }
+  @media (max-width: 480px) { .passos { grid-template-columns: minmax(0, 1fr); } .passos li { margin-right: 0; } }
+</style>
+
+<style>body{margin:0} img{max-width:100%}</style>
+</head>
+<body>
+<div class="faixa">
+  <div class="miolo">
+    <header class="barra">
+      <a class="marca" href="#topo">Ciclo Zero</a>
+      <nav aria-label="Seções">
+        <a href="#como-funciona">Como funciona</a>
+        <a href="#confianca">Por que confiar</a>
+        <a href="#para-quem">Para quem é</a>
+      </nav>
+    </header>
+
+    <main id="topo">
+      <div class="hero">
+        <div>
+          <h1>Seu estoque se controla sozinho. E a comida para de virar lixo.</h1>
+          <p class="lead">O Ciclo Zero é um agente de IA para padarias e mercadinhos. Ele lê a nota do fornecedor, acompanha a validade de cada lote e avisa, antes de vencer, o que pôr em promoção, o que doar e quanto comprar.</p>
+          <div class="acoes">
+            <a class="btn cheio" href="https://github.com/arthurarroyo101-lgtm/Ciclo-zero" target="_blank" rel="noopener">Ver o projeto no GitHub</a>
+            <a class="btn vazio" href="#como-funciona">Como funciona</a>
+          </div>
+        </div>
+        <figure class="gondola" style="margin:0" aria-label="Exemplo: etiqueta mostrando quanto vai para o lixo esta semana">
+          <div class="trilho" aria-hidden="true"></div>
+          <div class="etiqueta">
+            <div class="produto">Vai para o lixo esta semana</div>
+            <div class="detalhe">se nada for feito, numa padaria de bairro</div>
+            <div class="preco"><span class="rs">R$</span>490<span class="cent">,05</span></div>
+            <div class="rodape"><span>7 lotes vencendo</span><span>Ciclo Zero</span></div>
+          </div>
+          <figcaption class="legenda-hero">Números da padaria de demonstração do protótipo.</figcaption>
+        </figure>
+      </div>
+
+      <section class="dor">
+        <div>
+          <h2>Quem não mede, joga dinheiro fora sem perceber.</h2>
+          <p class="sub" style="margin-top:16px">Conversamos com comerciantes de Goiânia. A dor que mais apareceu não foi o desperdício em si, foi o trabalho de controlar o estoque na mão.</p>
+          <blockquote>
+            A gerente controla o estoque “no olhômetro”, repete anotações todos os dias e gasta algumas horas do dia com elas e com o planejamento das compras.
+            <footer>Entrevista com o Canto Caseiro, 23/10/2026</footer>
+          </blockquote>
+        </div>
+        <div class="numeros" aria-label="Perdas no varejo de alimentos">
+          <div class="numero"><b>5,25%</b><p>do faturamento de frutas, legumes e verduras se perde nos supermercados.</p></div>
+          <div class="numero"><b>2,74%</b><p>do faturamento de padaria e confeitaria também vira perda.</p></div>
+          <div class="numero"><b>1,79%</b><p>de perda no faturamento total, e esses são os números de quem mede.</p></div>
+          <p class="fonte">Fonte: ABRAS, 21ª Avaliação de Perdas no Varejo de Supermercados (2020), via <a href="https://www.tupi.fm/?p=515195" target="_blank" rel="noopener">Super Rádio Tupi</a>.</p>
+        </div>
+      </section>
+
+      <section id="como-funciona">
+        <h2>Da nota fiscal ao pedido de compra.</h2>
+        <p class="sub" style="margin-top:14px">O dono só confere e aprova. O resto o agente faz.</p>
+        <ol class="passos">
+          <li><h3>Fotografe a nota</h3><p>A IA lê fornecedor, itens e valores, confere se a soma bate e encontra cada item no estoque.</p></li>
+          <li><h3>Cada lote com validade</h3><p>As vendas entram do caixa. O agente sabe quanto de cada lote ainda vai vender antes de vencer.</p></li>
+          <li><h3>Aviso antes do prejuízo</h3><p>Toda manhã: o que vai sobrar, quanto vale e o que fazer. Compra exagerada é apontada na hora.</p></li>
+          <li><h3>Você aprova</h3><p>Promoções com preço sugerido, doação dentro da lei e pedidos sem excesso. Nada sai sem o seu ok.</p></li>
+        </ol>
+      </section>
+
+      <section class="recibo-bloco">
+        <div class="recibo" aria-label="Exemplo de rotina da manhã">
+          <h3>Rotina da manhã</h3>
+          <div class="hora">Padaria de demonstração</div>
+          <div class="linha-r"><span>Banana prata, 48 kg vão sobrar <span class="tag-acao promo">promoção</span></span><span>R$ 3,84/kg</span></div>
+          <div class="linha-r"><span>Pão de forma, 9 un <span class="tag-acao promo">promoção</span></span><span>R$ 7,74</span></div>
+          <div class="linha-r"><span>Frango resfriado, 12 kg <span class="tag-acao doa">doar hoje</span></span><span>R$ 132,00</span></div>
+          <div class="linha-r"><span>Pedido ao Ceasa, só o necessário</span><span>R$ 157,50</span></div>
+          <div class="linha-r"><span>Vai para o lixo se nada for feito</span><span>R$ 490,05</span></div>
+        </div>
+        <div>
+          <h2>Um funcionário de estoque que não esquece nada.</h2>
+          <ul class="lista-ok">
+            <li>Prevê, lote a lote, o que não vai ser vendido antes de vencer.</li>
+            <li>Sugere promoção com preço, doação ou descarte, nessa ordem.</li>
+            <li>Monta os pedidos por fornecedor sem comprar a mais, e sem duplicar o que já foi pedido.</li>
+            <li>Responde em português: “quanto vendi hoje?”, “o que vence esta semana?”, “posso doar esse pão?”.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="confianca">
+        <h2>Feito para não inventar nada.</h2>
+        <div class="confianca">
+          <div>
+            <h3>Números vêm do estoque</h3>
+            <p>Todo valor em R$ é calculado em código, a partir do banco de dados. O modelo de IA só escolhe as ferramentas e explica o resultado.</p>
+          </div>
+          <div>
+            <h3>Regras vêm da lei</h3>
+            <p>Doação e venda seguem a base legal conferida no site oficial: <span class="lei">Lei 15.224/2025</span>, Código de Defesa do Consumidor e Lei 8.137/1990. Fora da base, o agente diz que não sabe.</p>
+          </div>
+          <div>
+            <h3>Testado sozinho</h3>
+            <p>16 situações são testadas automaticamente: nome digitado errado, nota vencida, compra exagerada, pergunta fora do assunto. O próprio teste já revelou falhas que viraram travas no código.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="para-quem">
+        <h2>Para quem é.</h2>
+        <div class="quem">
+          <div class="sim">
+            <h3>Feito para</h3>
+            <ul>
+              <li>Padarias, mercadinhos, hortifrútis e lanchonetes de bairro</li>
+              <li>Quem controla o estoque em caderno, planilha ou de cabeça</li>
+              <li>Quem trabalha com produto que vence em dias</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Ainda não é para</h3>
+            <ul>
+              <li>Redes e franquias com sistema próprio já estruturado</li>
+              <li>Quem precisa de emissão de nota fiscal (o Ciclo Zero lê notas, não emite)</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<section class="fecho faixa" style="border-top:0">
+  <div class="miolo">
+    <h2>Pare de pagar pelo que vai para o lixo.</h2>
+    <p class="sub" style="margin-top:14px">Protótipo do AKCIT Camp 2026 (Centro-Oeste). Código aberto, licença MIT. Próximo passo: piloto de 30 dias numa padaria de Goiânia.</p>
+    <div class="acoes">
+      <a class="btn cheio" href="https://github.com/arthurarroyo101-lgtm/Ciclo-zero" target="_blank" rel="noopener">Ver o código no GitHub</a>
+    </div>
+  </div>
+</section>
+
+<div class="faixa">
+  <footer class="miolo rodape">
+    <span>Ciclo Zero, por Matheus, João Paulo e Arthur (Ciência de Dados e IA, PUC-GO).</span>
+    <span>Dados de demonstração fictícios. Informação legal não é aconselhamento jurídico.</span>
+  </footer>
+</div>
+
+</body>
+</html>

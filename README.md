@@ -21,6 +21,9 @@ Testes: `python -m tests.eval_agente` (agente, precisa de chave) e `python -m te
 
 **Entrada por foto da nota fiscal:** aba 📷 Nota fiscal — há uma nota fictícia de exemplo em `docs/exemplos/`.
 
+## Landing page
+Página de apresentação estática em [`landing/`](landing/) (abrir `landing/index.html`; publicação na Vercel em `landing/README.md`).
+
 ## Documentação
 - [Diário de decisões](docs/DECISOES.md)
 - [Divisão de tarefas](docs/TAREFAS.md)
