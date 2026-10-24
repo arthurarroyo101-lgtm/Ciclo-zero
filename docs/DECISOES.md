@@ -73,6 +73,7 @@ docs/FLUXO_AGENTE.md    → entregável: inputs, lógica, outputs (Arthur revisa
 Decisões de projeto: cálculos em Python (não no LLM) para evitar número inventado; FEFO na baixa de estoque; pedido de compra sempre como rascunho com aprovação humana; pedido > 2× o sugerido é bloqueado; desconto máximo 50%; máximo 8 passos por pergunta; modelo configurável por `GEMINI_MODEL` (padrão `gemini-3.8-flash`).
 
 ## Log
+- **2026-10-23 22:47** — João subiu a aba 📊 Dashboard (4 gráficos em Altair, `ciclozero/graficos.py`); integrada sem conflito com o agente. Matheus testou dashboard + agente (Groq) pela interface: aprovados pela equipe.
 - **2026-10-23 22:39** — ✅ **Avaliação v2: 10/10, fidelidade 100%, latência média 7,6 s** (era 11,9 s); rotina completa em 28 s com os 3 pedidos corretos. Parte do agente pronta para a demo.
 - **2026-10-23 22:35** — Rotina caiu para 27 s, mas com raciocínio baixo o modelo esqueceu 1 de 3 fornecedores. Solução: nova ferramenta `criar_pedidos_sugeridos` (um rascunho por fornecedor numa chamada, determinístico). `calcular_reposicao` agora desconta pedidos em aberto → rodar a rotina 2× não duplica pedidos. Teste C10 agora exige 1 rascunho por fornecedor que precisa de reposição. Rotina em 2 passos.
 - **2026-10-23 22:28** — Otimização de velocidade da rotina: `reasoning_effort=low` no gpt-oss (Groq, configurável por `GROQ_REASONING`), resultados enxutos para o modelo (~20% menos tokens; a interface continua vendo tudo) e rotina em 3 passos (ferramentas chamadas em paralelo). Meta: rotina < 30 s.
