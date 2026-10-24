@@ -299,23 +299,30 @@ def analisar_risco_desperdicio(dias: int = 5) -> dict:
 def calcular_reposicao() -> dict:
     """Calcula o que precisa ser comprado, por fornecedor, sem gerar excesso que vire desperdício.
 
-    Quantidade sugerida = média de vendas/dia x (prazo de entrega + dias de cobertura) - saldo atual,
-    respeitando o estoque mínimo. Produtos com sobra projetada não entram.
+    Quantidade sugerida = média de vendas/dia x (prazo de entrega + dias de cobertura) - saldo atual
+    - o que já foi pedido, respeitando o estoque mínimo. Produtos com sobra projetada não entram.
     """
     with conectar() as conn:
         prods = conn.execute("SELECT * FROM produtos").fetchall()
+        # o que já foi pedido (rascunho ou aprovado) conta como "a caminho": evita pedido duplicado
+        a_caminho: dict[str, float] = {}
+        for ped in conn.execute("SELECT itens_json FROM pedidos WHERE status IN ('rascunho','aprovado')"):
+            for item in json.loads(ped["itens_json"]):
+                a_caminho[item["produto"]] = a_caminho.get(item["produto"], 0) + item["quantidade"]
         por_forn: dict[str, list] = {}
         for p in prods:
             saldo = _saldo(conn, p["id"])
+            pedido = a_caminho.get(p["nome"], 0)
             media = _media_vendas_dia(conn, p["id"])
             alvo = max(media * (p["prazo_entrega_dias"] + COBERTURA_DIAS), p["estoque_minimo"])
-            precisa = round(alvo - saldo, 1)
-            if precisa > 0 and (saldo < p["estoque_minimo"] or saldo < media * p["prazo_entrega_dias"] * 1.5):
-                por_forn.setdefault(p["fornecedor"] or "sem fornecedor", []).append({
-                    "produto": p["nome"], "saldo": saldo, "media_vendas_dia": media,
-                    "quantidade_sugerida": precisa, "unidade": p["unidade"],
-                    "custo_estimado": round(precisa * p["preco_custo"], 2),
-                })
+            precisa = round(alvo - saldo - pedido, 1)
+            if precisa > 0 and (saldo + pedido < p["estoque_minimo"] or saldo + pedido < media * p["prazo_entrega_dias"] * 1.5):
+                item = {"produto": p["nome"], "saldo": saldo, "media_vendas_dia": media,
+                        "quantidade_sugerida": precisa, "unidade": p["unidade"],
+                        "custo_estimado": round(precisa * p["preco_custo"], 2)}
+                if pedido:
+                    item["ja_pedido"] = pedido
+                por_forn.setdefault(p["fornecedor"] or "sem fornecedor", []).append(item)
     return {"cobertura_dias": COBERTURA_DIAS, "sugestoes_por_fornecedor": por_forn}
 
 
@@ -360,6 +367,28 @@ def criar_pedido_compra(fornecedor: str, produtos: list[str], quantidades: list[
                 "fornecedor": fornecedor, "itens": itens, "valor_estimado": round(total, 2)}
 
 
+def criar_pedidos_sugeridos(fornecedores: list[str] | None = None) -> dict:
+    """Cria, de uma vez, um RASCUNHO de pedido para cada fornecedor com reposição necessária,
+    usando exatamente as quantidades de calcular_reposicao(). O dono aprova cada pedido na tela.
+
+    Args:
+        fornecedores: opcional; limite a estes fornecedores. Vazio = todos que precisam de reposição.
+    """
+    sugestoes = calcular_reposicao()["sugestoes_por_fornecedor"]
+    if fornecedores:
+        alvo = {_norm(f) for f in fornecedores}
+        sugestoes = {f: i for f, i in sugestoes.items() if _norm(f) in alvo}
+    pedidos = []
+    for forn, itens in sugestoes.items():
+        r = criar_pedido_compra(forn, [i["produto"] for i in itens], [i["quantidade_sugerida"] for i in itens],
+                                "Reposição automática: cobre o prazo de entrega + "
+                                f"{COBERTURA_DIAS} dias de vendas, sem excesso.")
+        pedidos.append(r if r.get("ok") else {"fornecedor": forn, **r})
+    return {"pedidos_criados": len([p for p in pedidos if p.get("ok")]), "pedidos": pedidos,
+            "valor_total_rs": round(sum(p.get("valor_estimado", 0) for p in pedidos), 2),
+            "status": "rascunhos aguardando aprovação do dono"}
+
+
 def relatorio_desperdicio(dias: int = 30) -> dict:
     """Resumo de perdas e doações no período, em quantidade e em R$ (custo).
 
@@ -392,6 +421,7 @@ FERRAMENTAS = [
     listar_produtos_vencendo,
     analisar_risco_desperdicio,
     calcular_reposicao,
+    criar_pedidos_sugeridos,
     criar_pedido_compra,
     relatorio_desperdicio,
 ]

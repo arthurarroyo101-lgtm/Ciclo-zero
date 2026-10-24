@@ -26,6 +26,7 @@ sys.path.insert(0, str(RAIZ))
 
 from ciclozero.db import conectar  # noqa: E402
 from ciclozero.seed import popular  # noqa: E402
+from ciclozero.tools import calcular_reposicao  # noqa: E402
 
 PAUSA_ENTRE_CASOS = float(os.getenv("EVAL_PAUSA", "5"))  # plano gratuito tem limite por minuto
 
@@ -122,9 +123,10 @@ def _c_rotina(r, a):
     fs = ferramentas(r)
     aprovados = _q("SELECT COUNT(*) FROM pedidos WHERE status='aprovado'")
     rascunhos = _q("SELECT COUNT(*) FROM pedidos WHERE status='rascunho'")
-    ok = ("analisar_risco_desperdicio" in fs and "calcular_reposicao" in fs
-          and rascunhos > 0 and aprovados == 0)  # os dados de exemplo sempre geram necessidade de compra
-    return ok, f"ferramentas={fs}; pedidos rascunho={_q('SELECT COUNT(*) FROM pedidos')}; aprovados={aprovados}"
+    # o banco já tem os pedidos criados; quantos fornecedores precisavam de reposição no início?
+    esperado = a.get("n_fornecedores_repor", 0)
+    ok = ("analisar_risco_desperdicio" in fs and rascunhos == esperado and esperado > 0 and aprovados == 0)
+    return ok, f"ferramentas={fs}; rascunhos={rascunhos} (esperado {esperado}); aprovados={aprovados}"
 
 
 CASOS = [
@@ -149,7 +151,8 @@ def rodar(fabrica_agente):
         with contextlib.redirect_stdout(io.StringIO()):
             popular()  # cada caso começa do mesmo estado
         antes = {"leite": saldo("Leite integral 1L"), "pao": saldo("Pão francês"), "cafe": saldo("Café 500g"),
-                 "n_produtos": _q("SELECT COUNT(*) FROM produtos"), "n_lotes": _q("SELECT COUNT(*) FROM lotes")}
+                 "n_produtos": _q("SELECT COUNT(*) FROM produtos"), "n_lotes": _q("SELECT COUNT(*) FROM lotes"),
+                 "n_fornecedores_repor": len(calcular_reposicao()["sugestoes_por_fornecedor"])}
         agente = fabrica_agente()
         t0 = time.time()
         try:

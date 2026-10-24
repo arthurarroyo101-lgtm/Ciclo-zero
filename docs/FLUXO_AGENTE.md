@@ -32,7 +32,8 @@
 | `listar_produtos_vencendo` | Lotes que vencem em N dias e o R$ em risco |
 | `analisar_risco_desperdicio` | Projeta quanto de cada lote **não** será vendido até vencer e recomenda promoção (com desconto e preço), doação ou descarte |
 | `calcular_reposicao` | Quanto comprar por fornecedor = vendas/dia × (prazo de entrega + 5 dias) − saldo; não compra o que vai sobrar |
-| `criar_pedido_compra` | Gera **rascunho** de pedido; o dono aprova na tela |
+| `criar_pedidos_sugeridos` | Gera, numa chamada só, um **rascunho** de pedido por fornecedor com as quantidades calculadas (nunca esquece fornecedor, não duplica pedido em aberto) |
+| `criar_pedido_compra` | Pedido específico que o usuário pedir; também só **rascunho** — o dono aprova na tela |
 | `relatorio_desperdicio` | Perdas e doações do período em R$ e % do faturamento |
 
 ## Lógica
@@ -41,15 +42,16 @@
 3. Cada chamada é validada e executada em Python; o resultado volta ao modelo como dado.
 4. O ciclo repete até a resposta final (máximo de 8 passos).
 
-**Exemplo — rotina diária:** `analisar_risco_desperdicio` → `calcular_reposicao` → `criar_pedido_compra` (um por fornecedor) → resumo com R$ em risco, R$ que o plano evita perder e pedidos aguardando aprovação.
+**Exemplo — rotina diária (2 passos, ~25 s):** `analisar_risco_desperdicio` + `criar_pedidos_sugeridos` (em paralelo) → resposta com plano por lote, pedidos criados e resumo (perda sem ação, receita recuperada com promoções, valor doado).
 
 ## Guardrails e confiabilidade
 | Risco | Como tratamos |
 |---|---|
-| Modelo inventar números | Regra: todo número vem de ferramenta. Cálculos são feitos em Python, não pelo LLM |
+| Modelo inventar números | Regra: todo número vem de ferramenta. Cálculos são feitos em Python, não pelo LLM. Medido: **fidelidade 100%** na avaliação automática |
+| Provedor de IA fora do ar | Troca automática de modelo e de provedor (Groq → Gemini) |
 | Nome de produto errado ("pao frances") | Busca tolerante a acento/erro; se ambíguo, devolve sugestões e o agente pergunta |
 | Entrada inválida (quantidade negativa, data no passado, saldo insuficiente) | Ferramenta recusa com mensagem clara; o agente explica ao usuário |
-| Comprar demais (gera desperdício) | Pedido acima de 2× o sugerido é bloqueado |
+| Comprar demais (gera desperdício) | Pedido acima de 2× o sugerido é bloqueado; o cálculo desconta o que já foi pedido (sem pedido duplicado) |
 | Ação cara sem supervisão | Pedido de compra é só rascunho; aprovação é humana |
 | Desconto exagerado | Limite de 50%; o agente sinaliza quando o preço promocional fica abaixo do custo |
 | Loop infinito / gasto de cota | Máximo de 8 passos por pergunta + novas tentativas automáticas se a API falhar |

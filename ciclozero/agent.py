@@ -44,7 +44,7 @@ GROQ_MODELS = [m.strip() for m in os.getenv(
     "GROQ_MODELS", "openai/gpt-oss-120b,llama-3.3-70b-versatile").split(",") if m.strip()]
 GROQ_RACIOCINIO = os.getenv("GROQ_REASONING", "low")  # low | medium | high (só modelos gpt-oss)
 MAX_PASSOS = 8
-FERRAMENTAS_QUE_ALTERAM = {"registrar_entrada", "registrar_saida", "criar_pedido_compra"}
+FERRAMENTAS_QUE_ALTERAM = {"registrar_entrada", "registrar_saida", "criar_pedido_compra", "criar_pedidos_sugeridos"}
 
 INSTRUCOES = """Você é o Ciclo Zero, agente de estoque de um pequeno comércio de alimentos (padaria/mercadinho).
 Missão: reduzir o desperdício de alimentos sem deixar faltar produto.
@@ -53,7 +53,7 @@ Regras:
 1. Todo número que você citar (quantidade, data, R$, %) deve vir de uma ferramenta. Nunca estime nem invente.
 2. Antes de responder sobre estoque, validade, compras ou perdas, chame a ferramenta adequada.
 3. Se uma ferramenta devolver "erro", leia a mensagem: corrija (ex.: use o nome sugerido) ou pergunte ao usuário.
-4. Pedidos de compra: chame calcular_reposicao antes de criar_pedido_compra. Pedidos ficam como rascunho até o dono aprovar; deixe isso claro.
+4. Pedidos de compra: para repor o que o cálculo sugere, use criar_pedidos_sugeridos (todos os fornecedores de uma vez). Use criar_pedido_compra só quando o usuário pedir algo específico, depois de calcular_reposicao. Pedidos ficam como rascunho até o dono aprovar; deixe isso claro.
 5. Para lotes em risco, priorize: promoção (vender) > doação (banco de alimentos/ONG) > descarte.
 6. Se o pedido estiver fora do seu escopo (não for sobre o estoque do comércio), diga educadamente que só ajuda com estoque e desperdício, sem responder a pergunta.
 7. Datas: sempre escreva no formato brasileiro DD/MM/AAAA. Ao passar validade para ferramentas, use DD/MM/AAAA.
@@ -63,11 +63,8 @@ Hoje é {hoje} ({dia_semana})."""
 
 ROTINA_DIARIA = (
     "Execute a rotina diária de abertura da loja, sem pedir confirmação, no MENOR número de passos:\n"
-    "Passo A: chame JUNTAS, na mesma resposta, analisar_risco_desperdicio(dias=5) e calcular_reposicao().\n"
-    "Passo B: chame JUNTAS, na mesma resposta, uma criar_pedido_compra para CADA fornecedor em "
-    "'sugestoes_por_fornecedor', com os produtos e as quantidades sugeridas (são rascunhos; o dono aprova depois). "
-    "Se não houver sugestões, pule este passo.\n"
-    "Passo C: responda com (1) o plano de ação por lote em lista curta (produto, ação, preço promocional ou quantidade "
+    "Passo A: chame JUNTAS, na mesma resposta, analisar_risco_desperdicio(dias=5) e criar_pedidos_sugeridos().\n"
+    "Passo B: responda com (1) o plano de ação por lote em lista curta (produto, ação, preço promocional ou quantidade "
     "para doar), (2) os pedidos criados (número, fornecedor, valor) e (3) um resumo usando EXATAMENTE os campos de "
     "'resumo' da análise: perda total se nada for feito, receita recuperada com as promoções e custo dos itens "
     "doados. Não some nem recalcule valores."
