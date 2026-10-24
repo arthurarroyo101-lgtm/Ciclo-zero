@@ -254,59 +254,75 @@ def _reais(v: float) -> str:
 
 
 _CARTOES_HTML = """
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,700..900&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  :root { --fundo:#ffffff; --borda:#e3e7ea; --texto:#1f2328; --sub:#5f6368; }
-  @media (prefers-color-scheme: dark) { :root.auto { --fundo:#1b1f24; --borda:#30363d; --texto:#f0f3f6; --sub:#9aa4ae; } }
-  :root.dark { --fundo:#1b1f24; --borda:#30363d; --texto:#f0f3f6; --sub:#9aa4ae; }
-  html, body { margin:0; padding:0; background:transparent; font-family:"Source Sans Pro","Source Sans 3",system-ui,sans-serif; }
-  .grade { display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:10px; }
-  .cartao { background:var(--fundo); border:1px solid var(--borda); border-radius:12px; padding:10px 12px; min-width:0; }
-  .rotulo { color:var(--sub); font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .valor { color:var(--texto); font-size:clamp(16px, 2.0vw, 28px); font-weight:700; line-height:1.25; font-variant-numeric:tabular-nums;
-           white-space:nowrap; transition:color .4s; }
-  .delta { font-size:13px; font-weight:600; border-radius:999px; padding:1px 8px; display:inline-block; margin-top:2px;
-           opacity:0; transition:opacity .3s; }
+  /* Etiquetas de gôndola (docs/DESIGN.md): valor grande, "R$" pequeno, cantos de etiqueta */
+  :root { --tinta:#1D2B22; --tinta2:#4F5E54; --folha:#2F6B3B; --etiqueta:#F6D23C; --tomate:#C8402B;
+          --linha:#D9DED6; --fundo:#FFFFFF; }
+  html, body { margin:0; padding:0; background:transparent; color:var(--tinta);
+               font-family:"Atkinson Hyperlegible", system-ui, sans-serif; }
+  .grade { display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:10px; padding:2px; }
+  .tag { position:relative; background:var(--fundo); border:1.5px solid var(--linha); border-radius:6px;
+         padding:9px 12px 8px; min-width:0; }
+  .tag.destaque { background:var(--etiqueta); border-color:#D9B51F; }
+  .tag.destaque::before { content:""; position:absolute; right:10px; top:9px; width:9px; height:9px;
+                          border-radius:50%; background:#fff; border:1.5px solid #C9A616; }  /* furo da etiqueta */
+  .rotulo { font-size:13px; color:var(--tinta2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tag.destaque .rotulo { color:var(--tinta); font-weight:700; }
+  .valor { font-family:"Archivo", "Atkinson Hyperlegible", sans-serif; font-weight:800; font-stretch:85%;
+           font-size:clamp(20px, 2.7vw, 34px); line-height:1.15; white-space:nowrap;
+           font-variant-numeric:tabular-nums; letter-spacing:-.01em; }
+  .valor .rs { font-size:.5em; font-weight:700; vertical-align:.55em; margin-right:2px; }
+  .valor.negativo { color:var(--tomate); }
+  .nota { font-size:12px; color:var(--tinta2); margin-top:1px; min-height:16px; }
+  .delta { font-size:12px; font-weight:700; margin-top:1px; min-height:16px; opacity:0; transition:opacity .3s; }
   .delta.mostra { opacity:1; }
-  .bom { color:#1a7f37; background:rgba(46,160,67,.15); } .ruim { color:#cf222e; background:rgba(248,81,73,.15); }
-  .neutro { color:var(--sub); background:transparent; opacity:1; }
-  .pisca-bom { color:#2ea043 !important; } .pisca-ruim { color:#f85149 !important; }
-  .negativo { color:#cf222e; }
+  .bom { color:var(--folha); } .ruim { color:var(--tomate); }
+  .pisca-bom { color:var(--folha) !important; } .pisca-ruim { color:var(--tomate) !important; }
+  @media (prefers-reduced-motion: reduce) { .delta { transition:none; } }
 </style>
 <div class="grade" id="g"></div>
 <script>
-document.documentElement.className = "__TEMA__";
 const CARTOES = __DADOS__;
-const fmtR = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'});
-const fmt = (c, v) => c.tipo === 'reais' ? fmtR.format(v) : Math.round(v).toLocaleString('pt-BR');
+const reduz = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const num = new Intl.NumberFormat('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+const valorHTML = (c, v) => {
+  if (c.tipo !== 'reais') return Math.round(v).toLocaleString('pt-BR');
+  const sinal = v < 0 ? '−' : '';
+  return `${sinal}<span class="rs">R$</span>${num.format(Math.abs(v))}`;
+};
 const g = document.getElementById('g');
 CARTOES.forEach((c, i) => {
   const d = c.para - c.de;
-  let cls = 'neutro', txt = c.nota || '';
+  let cls = '', txt = '';
   if (Math.abs(d) > 1e-9) {
     const melhorou = c.menor_melhor ? d < 0 : d > 0;
     cls = melhorou ? 'bom' : 'ruim';
-    txt = (d > 0 ? '▲ ' : '▼ ') + (c.tipo === 'reais' ? fmtR.format(Math.abs(d)) : Math.abs(Math.round(d)));
+    txt = (d > 0 ? '+' : '−') + (c.tipo === 'reais' ? 'R$ ' + num.format(Math.abs(d)) : Math.abs(Math.round(d)));
   }
   g.insertAdjacentHTML('beforeend',
-    `<div class="cartao"><div class="rotulo">${c.rotulo}</div>
-       <div class="valor" id="v${i}">${fmt(c, c.de)}</div>
-       <div class="delta ${cls}" id="d${i}">${txt || '&nbsp;'}</div></div>`);
+    `<div class="tag ${c.destaque ? 'destaque' : ''}" role="group" aria-label="${c.rotulo}">
+       <div class="rotulo">${c.rotulo}</div>
+       <div class="valor" id="v${i}">${valorHTML(c, reduz ? c.para : c.de)}</div>
+       ${c.nota ? `<div class="nota">${c.nota}</div>` : `<div class="delta ${cls}" id="d${i}">${txt || '&nbsp;'}</div>`}
+     </div>`);
 });
-const t0 = performance.now(), DUR = 1100;
+const t0 = performance.now(), DUR = reduz ? 0 : 1100;
 const ease = t => 1 - Math.pow(1 - t, 3);
 function quadro(agora) {
-  const p = Math.min(1, (agora - t0) / DUR);
+  const p = DUR ? Math.min(1, (agora - t0) / DUR) : 1;
   CARTOES.forEach((c, i) => {
     const el = document.getElementById('v' + i);
-    el.textContent = fmt(c, c.de + (c.para - c.de) * ease(p));
+    el.innerHTML = valorHTML(c, c.de + (c.para - c.de) * ease(p));
     if (p < 1 && c.para !== c.de) el.classList.add((c.menor_melhor ? c.para < c.de : c.para > c.de) ? 'pisca-bom' : 'pisca-ruim');
     if (p >= 1) el.classList.remove('pisca-bom', 'pisca-ruim');
-    el.classList.toggle('negativo', c.tipo === 'reais' && c.para < 0 && p >= 1);
+    el.classList.toggle('negativo', c.tipo === 'reais' && c.para < 0 && p >= 1 && !c.destaque);
   });
   if (p < 1) requestAnimationFrame(quadro);
 }
 requestAnimationFrame(quadro);
-setTimeout(() => CARTOES.forEach((c, i) => document.getElementById('d' + i).classList.add('mostra')), 150);
+setTimeout(() => CARTOES.forEach((c, i) => { const d = document.getElementById('d' + i); if (d) d.classList.add('mostra'); }), 150);
 </script>
 """
 
@@ -319,7 +335,7 @@ def _cartoes(cartoes: list[dict]) -> None:
     import streamlit as st
     tema = "light"  # o app usa tema claro fixo (.streamlit/config.toml) — melhor no projetor
     html = _CARTOES_HTML.replace("__DADOS__", _json.dumps(cartoes, ensure_ascii=False)).replace("__TEMA__", tema)
-    components.html(html, height=118)
+    components.html(html, height=112)
 
 
 def intervalo() -> int | None:
@@ -389,17 +405,17 @@ def painel() -> None:
                  "vendas": hoje["vendas"], "caixa": fin["caixa_rs"], "lucro": fin["lucro_rs"]}
 
         if sim.ativo:
-            st.caption("🟢 **ao vivo**" + (" — simulação acelerada de um dia de loja" if st.session_state.get("tecnico") else ""))
+            st.caption("🟢 Loja ao vivo" + (" (simulação acelerada de um dia de loja)" if st.session_state.get("tecnico") else ""))
         de = lambda k: anterior.get(k, atual[k])
         _cartoes([
             {"rotulo": "Vendas hoje", "tipo": "reais", "de": de("fat"), "para": atual["fat"]},
             {"rotulo": "Caixa do dia", "tipo": "reais", "de": de("caixa"), "para": atual["caixa"]},
             {"rotulo": "Lucro do dia", "tipo": "reais", "de": de("lucro"), "para": atual["lucro"]},
-            {"rotulo": "Lotes em risco · 5 dias", "tipo": "int", "de": de("lotes"), "para": atual["lotes"],
+            {"rotulo": "Lotes em risco", "tipo": "int", "de": de("lotes"), "para": atual["lotes"],
              "menor_melhor": True},
-            {"rotulo": "Perda se nada for feito", "tipo": "reais", "de": de("perda"), "para": atual["perda"],
-             "menor_melhor": True},
-            {"rotulo": "Perdas · 30 dias", "tipo": "reais", "de": perdas["total_perdas_rs"],
+            {"rotulo": "Vai para o lixo", "tipo": "reais", "de": de("perda"), "para": atual["perda"],
+             "menor_melhor": True, "destaque": True},
+            {"rotulo": "Jogado fora no mês", "tipo": "reais", "de": perdas["total_perdas_rs"],
              "para": perdas["total_perdas_rs"], "nota": perdas["perdas_sobre_faturamento"].replace(".", ",") + " do faturamento"},
         ])
         if sim.ativo and sim.eventos and st.session_state.get("tecnico"):

@@ -21,9 +21,14 @@ def _reais(v) -> str:
 
 def render(obter_agente) -> None:
     """obter_agente: função sem argumentos que devolve o agente (ou None se não houver chave)."""
-    st.subheader("📷 Entrada de mercadoria pela nota fiscal")
-    st.caption("Tire uma foto da nota do fornecedor. O agente lê os itens, associa ao seu cadastro e sugere a "
-               "validade. Você confere e confirma: **nada entra no estoque sem a sua confirmação.**")
+    st.markdown("""<style>
+      .st-key-cz_nota_recibo { background:#EFE6D6; border:1.5px solid #D8C9AE; border-radius:6px; padding:14px 18px; }
+      .st-key-cz_nota_recibo [data-testid="stMetricValue"] { font-family:"Archivo", sans-serif; font-weight:800;
+                                                            font-stretch:85%; font-variant-numeric:tabular-nums; }
+    </style>""", unsafe_allow_html=True)
+    st.subheader("Entrada de mercadoria pela nota fiscal")
+    st.caption("Fotografe a nota do fornecedor. O Ciclo Zero lê os itens, encontra cada um no seu estoque e "
+               "sugere a validade. Você confere e lança: nada entra no estoque sem a sua confirmação.")
 
     n_aprendidos = nf.aprendidos()
     if n_aprendidos:
@@ -56,7 +61,7 @@ def render(obter_agente) -> None:
             escolha = st.radio("Como ler", list(opcoes_metodo), horizontal=True,
                                help="Automático: tenta a visão do Gemini e, se falhar, o OCR local (Tesseract) "
                                     "+ IA de texto. O OCR roda no seu computador.")
-            if st.button("🔎 Ler nota com IA", type="primary"):
+            if st.button("Ler nota", type="primary"):
                 with st.status("Lendo a nota...", expanded=True) as status:
                     status.write("👁️ lendo a nota: fornecedor, itens e valores" +
                                  (" (OCR local + IA de texto)" if opcoes_metodo[escolha] == "ocr" else ""))
@@ -71,23 +76,24 @@ def render(obter_agente) -> None:
                     st.session_state.nota_dados = dados
                     st.session_state.nota_linhas = nf.conciliar(dados)
                     st.session_state.pop("nota_resultado", None)
-                    status.update(label="Nota lida — confira abaixo", state="complete", expanded=False)
+                    status.update(label="Nota lida. Confira abaixo.", state="complete", expanded=False)
 
     dados = st.session_state.get("nota_dados")
     if not dados:
         return
 
-    st.divider()
     v = dados["verificacao"]
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Fornecedor", dados.get("fornecedor") or "—")
-    m2.metric("Nota nº", dados.get("numero") or "—")
-    m3.metric("Total da nota", _reais(v["total_nota"]))
-    m4.metric("Soma dos itens", _reais(v["soma_itens"]))
-    if v["confiavel"]:
-        st.success("✅ Leitura verificada: a soma dos itens confere com o total da nota.")
-    else:
-        st.warning("⚠️ Confira com atenção antes de lançar: " + "; ".join(v["problemas"] or ["leitura incerta"]))
+    with st.container(key="cz_nota_recibo"):
+        st.markdown(f"#### {dados.get('fornecedor') or 'Fornecedor não identificado'}")
+        st.caption(f"Nota nº {dados.get('numero') or 'não identificado'}"
+                   + (f", emitida em {dados['data_emissao']}" if dados.get("data_emissao") else ""))
+        m1, m2 = st.columns(2)
+        m1.metric("Total da nota", _reais(v["total_nota"]))
+        m2.metric("Soma dos itens lidos", _reais(v["soma_itens"]))
+        if v["confiavel"]:
+            st.success("Leitura conferida: a soma dos itens bate com o total da nota.")
+        else:
+            st.warning("Confira antes de lançar: " + "; ".join(v["problemas"] or ["leitura incerta"]))
 
     with conectar() as conn:
         nomes = [r["nome"] for r in conn.execute("SELECT nome FROM produtos ORDER BY nome")]
@@ -117,23 +123,23 @@ def render(obter_agente) -> None:
         st.info("Itens sem produto correspondente não serão lançados: " + ", ".join(faltando) +
                 ". Cadastre-os pelo chat do agente (ex.: \"cadastra o produto Manteiga...\").")
 
-    if st.button("✅ Confirmar e lançar no estoque", type="primary"):
+    if st.button("Lançar no estoque", type="primary"):
         linhas = [r for r in editado.to_dict("records") if r["lancar"] and r["produto"]]
         resultado = nf.registrar_nota(linhas, dados)
         st.session_state.nota_resultado = resultado
         agente = obter_agente()
         if agente and resultado["lancados"]:
-            with st.status("O agente está avaliando o risco desta compra...", expanded=True) as status:
+            with st.status("Verificando se esta compra vai sobrar...", expanded=True) as status:
                 agente.ao_passo = status.write
                 st.session_state.nota_analise = agente.perguntar(nf.mensagem_para_agente(dados, resultado))
-                status.update(label="Análise concluída", state="complete", expanded=False)
+                status.update(label="Verificação concluída", state="complete", expanded=False)
         else:
             st.session_state.pop("nota_analise", None)
 
     resultado = st.session_state.get("nota_resultado")
     if resultado:
         if resultado["lancados"]:
-            st.success(f"📦 {len(resultado['lancados'])} lote(s) lançado(s): " +
+            st.success(f"{len(resultado['lancados'])} lote(s) lançado(s) no estoque: " +
                        ", ".join(f"{r['quantidade']:g} {r['produto']} (validade {r['validade'][8:10]}/{r['validade'][5:7]})"
                                  for r in resultado["lancados"]))
         for r in resultado["recusados"]:
