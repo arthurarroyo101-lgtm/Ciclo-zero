@@ -197,5 +197,14 @@ def relatorio(res, modelo):
 
 
 if __name__ == "__main__":
-    from ciclozero.agent import MODELO, AgenteCicloZero
-    relatorio(rodar(AgenteCicloZero), MODELO)
+    from ciclozero.agent import AgenteCicloZero
+    usados = []
+
+    def fabrica():
+        a = AgenteCicloZero()
+        a.ao_passo = lambda t: print("      " + t, flush=True) if t.startswith(("🔁", "⏭️")) else None
+        usados.append(a)
+        return a
+
+    res = rodar(fabrica)
+    relatorio(res, usados[-1].modelo if usados else "?")

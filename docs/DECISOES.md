@@ -20,6 +20,7 @@
 - **Interface:** Streamlit
 - **Banco:** SQLite (arquivo local, zero custo)
 - **LLM:** Google Gemini (plano gratuito) com function calling — a equipe não tem créditos AWS
+- **LLM reserva:** Groq (gratuito, API compatível com OpenAI) — troca automática se o Gemini cair
 - **Repositório:** público, licença MIT (o edital valoriza código aberto)
 
 ## Prazos do dia (24/10)
@@ -71,6 +72,7 @@ docs/FLUXO_AGENTE.md    → entregável: inputs, lógica, outputs (Arthur revisa
 Decisões de projeto: cálculos em Python (não no LLM) para evitar número inventado; FEFO na baixa de estoque; pedido de compra sempre como rascunho com aprovação humana; pedido > 2× o sugerido é bloqueado; desconto máximo 50%; máximo 8 passos por pergunta; modelo configurável por `GEMINI_MODEL` (padrão `gemini-3.8-flash`).
 
 ## Log
+- **2026-10-23 22:00** — Gemini instável à noite (429 cota, 503 sobrecarga, 504 timeout em todos os modelos). Decidido adicionar **Groq como provedor reserva automático** (ordem em `PROVEDORES`). O agente agora mantém a conversa em texto comum aos provedores; se um cair depois de já ter alterado o estoque, não repete a operação no outro (evita lançamento duplicado). Interface mostra os passos do agente ao vivo (`st.status`).
 - **2026-10-23 21:52** — Gemini com 503 (sobrecarga do Google). Criado fallback automático de modelos (`GEMINI_MODELOS_RESERVA`): se o principal cair, o agente troca sozinho — protege a demo ao vivo.
 - **2026-10-23 21:48** — `gemini-3.8-flash` deu 504 (tempo esgotado) por raciocinar demais com 8 ferramentas. Raciocínio limitado a `low` (configurável por `GEMINI_THINKING`). Agente agora mostra o progresso de cada passo e tem timeout de 60 s por chamada.
 - **2026-10-23 21:45** — Criada a avaliação automática `tests/eval_agente.py`: 10 casos (uso normal, robustez, guardrails, fora de escopo, rotina autônoma), mede acerto, fidelidade dos R$ citados e latência; gera `docs/AVALIACAO.md` como evidência para a banca. Obs.: a API do Gemini só é acessível do computador de cada um.

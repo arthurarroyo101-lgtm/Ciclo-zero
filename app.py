@@ -37,15 +37,16 @@ def reais(v: float) -> str:
 
 
 @st.cache_resource
-def get_agente(chave: str):
+def get_agente(chave: str | None):
     from ciclozero.agent import AgenteCicloZero
-    return AgenteCicloZero(api_key=chave)
+    return AgenteCicloZero(api_key=chave or None)
 
 
 with st.sidebar:
     st.title("♻️ Ciclo Zero")
     st.caption("Agente de IA contra o desperdício de alimentos no pequeno comércio")
-    chave = os.getenv("GEMINI_API_KEY") or st.text_input("Chave do Gemini", type="password")
+    tem_env = bool(os.getenv("GEMINI_API_KEY") or os.getenv("GROQ_API_KEY"))
+    chave = "" if tem_env else st.text_input("Chave do Gemini", type="password")
     if st.button("🔄 Recriar dados de exemplo"):
         from ciclozero.seed import popular
         popular()
@@ -66,14 +67,16 @@ c4.metric("Perdas últimos 30 dias", reais(perdas["total_perdas_rs"]), perdas["p
 aba_chat, aba_painel, aba_pedidos, aba_log = st.tabs(["💬 Agente", "📦 Estoque", "🧾 Pedidos", "🔍 Rastreio"])
 
 with aba_chat:
-    if not chave:
+    if not (tem_env or chave):
         st.info("Informe a chave do Gemini na barra lateral (ou no arquivo .env) para conversar com o agente.")
     else:
         agente = get_agente(chave)
         st.session_state.setdefault("chat", [])
         if st.button("▶️ Rodar rotina diária (modo autônomo)", type="primary"):
-            with st.spinner("O agente está analisando o estoque..."):
+            with st.status("O agente está trabalhando...", expanded=True) as status:
+                agente.ao_passo = status.write
                 r = agente.rotina_diaria()
+                status.update(label="Rotina concluída", state="complete", expanded=False)
             st.session_state.chat.append(("user", "▶️ Rotina diária"))
             st.session_state.chat.append(("assistant", r))
         for papel, conteudo in st.session_state.chat:
@@ -89,8 +92,10 @@ with aba_chat:
                                 st.json(p["resultado"], expanded=False)
         if msg := st.chat_input("Ex.: chegaram 30 litros de leite com validade 30/10/2026"):
             st.session_state.chat.append(("user", msg))
-            with st.spinner("Pensando..."):
+            with st.status("O agente está trabalhando...", expanded=True) as status:
+                agente.ao_passo = status.write
                 st.session_state.chat.append(("assistant", agente.perguntar(msg)))
+                status.update(label="Pronto", state="complete", expanded=False)
             st.rerun()
 
 with aba_painel:

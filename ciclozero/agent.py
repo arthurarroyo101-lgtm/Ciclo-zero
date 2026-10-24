@@ -1,42 +1,49 @@
-"""Agente Ciclo Zero: loop de raciocínio + function calling com o Gemini.
+"""Agente Ciclo Zero: loop de raciocínio + function calling.
 
 Fluxo:  entrada (usuário ou rotina automática)
-        -> Gemini decide quais ferramentas chamar (pode encadear várias)
+        -> o LLM decide quais ferramentas chamar (pode encadear várias)
         -> cada chamada é validada, executada e registrada em log_agente
-        -> Gemini responde usando SOMENTE os números devolvidos pelas ferramentas.
+        -> o LLM responde usando SOMENTE os números devolvidos pelas ferramentas.
+
+Provedores (com troca automática se um cair):
+- Gemini (Google) — vários modelos em sequência (GEMINI_MODEL + GEMINI_MODELOS_RESERVA)
+- Groq (gratuito, rápido, API compatível com OpenAI) — GROQ_MODELS
+A ordem vem de PROVEDORES no .env (padrão: "gemini,groq"); só entra quem tiver chave.
 
 Guardrails:
 - limite de passos por pergunta (evita loop infinito e gasto de cota)
 - só ferramentas da lista FERRAMENTAS podem ser executadas
 - erros de ferramenta voltam ao modelo como dado, para ele se corrigir
+- se o provedor cair DEPOIS de o agente já ter alterado o estoque, não repete a pergunta em outro
+  provedor (evitaria lançar a mesma entrada duas vezes); avisa o usuário
 - compras saem como rascunho; o humano aprova na interface
 """
 from __future__ import annotations
 
+import inspect
 import json
 import os
+import re
 import time
 import uuid
 from datetime import date
 
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
 
 from .db import conectar, criar_tabelas
-import re
-
 from .tools import FERRAMENTAS, data_br
 
 load_dotenv()
 
+PROVEDORES = [p.strip().lower() for p in os.getenv("PROVEDORES", "gemini,groq").split(",") if p.strip()]
 MODELO = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
-# se o modelo principal estiver fora do ar/lento (503/504/429), o agente troca para estes, em ordem
 MODELOS_RESERVA = [m.strip() for m in os.getenv(
-    "GEMINI_MODELOS_RESERVA", "gemini-flash-latest,gemini-flash-lite-latest,gemini-3.8-flash").split(",") if m.strip()]
+    "GEMINI_MODELOS_RESERVA", "gemini-flash-latest,gemini-flash-lite-latest").split(",") if m.strip()]
+NIVEL_RACIOCINIO = os.getenv("GEMINI_THINKING", "low")  # minimal | low | medium | high
+GROQ_MODELS = [m.strip() for m in os.getenv(
+    "GROQ_MODELS", "openai/gpt-oss-120b,llama-3.3-70b-versatile").split(",") if m.strip()]
 MAX_PASSOS = 8
-# nível de raciocínio do modelo: "minimal", "low", "medium" ou "high" (menos = mais rápido)
-NIVEL_RACIOCINIO = os.getenv("GEMINI_THINKING", "low")
+FERRAMENTAS_QUE_ALTERAM = {"registrar_entrada", "registrar_saida", "criar_pedido_compra"}
 
 INSTRUCOES = """Você é o Ciclo Zero, agente de estoque de um pequeno comércio de alimentos (padaria/mercadinho).
 Missão: reduzir o desperdício de alimentos sem deixar faltar produto.
@@ -47,7 +54,7 @@ Regras:
 3. Se uma ferramenta devolver "erro", leia a mensagem: corrija (ex.: use o nome sugerido) ou pergunte ao usuário.
 4. Pedidos de compra: chame calcular_reposicao antes de criar_pedido_compra. Pedidos ficam como rascunho até o dono aprovar; deixe isso claro.
 5. Para lotes em risco, priorize: promoção (vender) > doação (banco de alimentos/ONG) > descarte.
-6. Se o pedido estiver fora do seu escopo (não for sobre o estoque do comércio), diga educadamente que só ajuda com estoque e desperdício.
+6. Se o pedido estiver fora do seu escopo (não for sobre o estoque do comércio), diga educadamente que só ajuda com estoque e desperdício, sem responder a pergunta.
 7. Datas: sempre escreva no formato brasileiro DD/MM/AAAA. Ao passar validade para ferramentas, use DD/MM/AAAA.
 8. Valores em reais no formato R$ 1.234,56.
 9. Responda em português do Brasil, curto e prático, como quem fala com o dono do comércio. Use listas quando houver vários itens.
@@ -65,6 +72,11 @@ _DIAS = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta
 _ISO = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
+class ProvedorIndisponivel(Exception):
+    """O provedor de LLM não respondeu (cota, sobrecarga, chave, rede)."""
+
+
+# ------------------------------------------------------------------ utilitários
 def _datas_br(obj):
     """Converte toda data ISO do resultado para DD/MM/AAAA antes de mostrar ao modelo."""
     if isinstance(obj, dict):
@@ -96,101 +108,234 @@ def _executar(nome: str, args: dict) -> dict:
         return {"erro": f"Falha ao executar {nome}: {e}"}
 
 
-class AgenteCicloZero:
-    def __init__(self, api_key: str | None = None, modelo: str = MODELO):
-        criar_tabelas()
-        chave = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-        if not chave:
-            raise RuntimeError("Defina GEMINI_API_KEY no arquivo .env")
-        self.client = genai.Client(api_key=chave, http_options=types.HttpOptions(timeout=60_000))  # 60 s por chamada
-        self.modelo = modelo
-        self.historico: list[types.Content] = []
-        self.ao_passo = None  # callback opcional para mostrar o progresso (terminal/Streamlit)
-        self.sessao = uuid.uuid4().hex[:8]
+def _schema_openai(func) -> dict:
+    """Gera o JSON Schema de uma ferramenta (formato OpenAI/Groq) a partir da assinatura e docstring."""
+    doc = inspect.getdoc(func) or ""
+    descricao = doc.split("\n\nArgs:")[0].strip()
+    desc_args = dict(re.findall(r"^\s{4}(\w+): (.+)$", doc, flags=re.M))
+    tipos = {"str": "string", "float": "number", "int": "integer", "bool": "boolean"}
+    props, obrig = {}, []
+    for nome, p in inspect.signature(func).parameters.items():
+        anot = str(p.annotation)
+        if anot.startswith("list["):
+            item = tipos.get(anot[5:-1], "string")
+            sch = {"type": "array", "items": {"type": item}}
+        else:
+            sch = {"type": tipos.get(anot, "string")}
+        if nome in desc_args:
+            sch["description"] = desc_args[nome]
+        props[nome] = sch
+        if p.default is inspect.Parameter.empty:
+            obrig.append(nome)
+    return {"type": "function", "function": {"name": func.__name__, "description": descricao,
+                                             "parameters": {"type": "object", "properties": props, "required": obrig}}}
+
+
+# ------------------------------------------------------------------- provedores
+class _Gemini:
+    nome = "gemini"
+
+    def __init__(self, chave: str, avisar):
+        from google import genai
+        from google.genai import types
+        self.types = types
+        self.client = genai.Client(api_key=chave, http_options=types.HttpOptions(timeout=60_000))
+        self.modelo = MODELO
+        self.avisar = avisar
         self.config = types.GenerateContentConfig(
-            system_instruction=INSTRUCOES.format(hoje=date.today().strftime("%d/%m/%Y"),
-                                                  dia_semana=_DIAS[date.today().weekday()]),
             tools=FERRAMENTAS,
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
             temperature=0.2,
             thinking_config=types.ThinkingConfig(thinking_level=NIVEL_RACIOCINIO) if NIVEL_RACIOCINIO else None,
         )
 
+    def _ajustar_raciocinio(self):
+        """Modelos 3.x usam 'nível' de raciocínio; 2.x usam 'orçamento'. Alterna entre os dois."""
+        t, tc = self.types, self.config.thinking_config
+        if tc is None:
+            return False
+        if tc.thinking_level is not None:
+            orc = {"minimal": 0, "low": 512, "medium": 2048}.get(NIVEL_RACIOCINIO, -1)
+            self.config.thinking_config = t.ThinkingConfig(thinking_budget=orc)
+        elif tc.thinking_budget is not None and NIVEL_RACIOCINIO:
+            self.config.thinking_config = t.ThinkingConfig(thinking_level=NIVEL_RACIOCINIO)
+        return True
+
     def _gerar(self, contents):
-        """Chama o Gemini com novas tentativas e troca de modelo se o atual estiver indisponível."""
         candidatos = [self.modelo] + [m for m in MODELOS_RESERVA if m != self.modelo]
-        ultimo_erro = None
+        ultimo = ""
         for modelo in candidatos:
-            for tentativa in range(2):
+            ajustes = 0
+            tentativa = 0
+            max_tent = 2 if modelo == self.modelo else 1  # reservas: uma tentativa só, para trocar rápido
+            while tentativa < max_tent:
                 try:
                     resp = self.client.models.generate_content(model=modelo, contents=contents, config=self.config)
                     if modelo != self.modelo:
-                        self._avisar(f"🔁 usando o modelo reserva {modelo}")
-                        self.modelo = modelo  # mantém o que funcionou para os próximos passos
+                        self.avisar(f"🔁 Gemini: usando {modelo}")
+                        self.modelo = modelo
                     return resp
                 except Exception as e:
-                    msg, ultimo_erro = str(e), e
-                    # ajusta a configuração de raciocínio conforme a família do modelo
-                    if "thinking" in msg.lower() and self.config.thinking_config is not None:
-                        tc = self.config.thinking_config
-                        if tc.thinking_level is not None:
-                            orcamento = {"minimal": 0, "low": 512, "medium": 2048}.get(NIVEL_RACIOCINIO, -1)
-                            self.config.thinking_config = types.ThinkingConfig(thinking_budget=orcamento)
-                        elif tc.thinking_budget is not None and NIVEL_RACIOCINIO:
-                            self.config.thinking_config = types.ThinkingConfig(thinking_level=NIVEL_RACIOCINIO)
-                        else:
-                            self.config.thinking_config = None
-                        try:
-                            resp = self.client.models.generate_content(model=modelo, contents=contents, config=self.config)
-                            self.modelo = modelo
-                            return resp
-                        except Exception as e2:
-                            msg, ultimo_erro = str(e2), e2
-                    if any(c in msg for c in ("401", "403", "API key")):
-                        raise  # chave errada: trocar de modelo não resolve
-                    if any(c in msg for c in ("404", "INVALID_ARGUMENT")):
-                        break  # modelo não existe/não aceita: vai para o próximo
-                    self._avisar(f"⏳ {modelo} indisponível ({msg[:60]}...)")
+                    ultimo = str(e)
+                    if "thinking" in ultimo.lower() and ajustes < 2 and self._ajustar_raciocinio():
+                        ajustes += 1
+                        continue  # mesma tentativa, com a configuração de raciocínio trocada
+                    if any(c in ultimo for c in ("401", "403", "API key")):
+                        raise ProvedorIndisponivel(f"chave do Gemini inválida: {ultimo[:120]}")
+                    if any(c in ultimo for c in ("404", "INVALID_ARGUMENT")):
+                        self.avisar(f"⏭️ {modelo} não disponível")
+                        break
+                    self.avisar(f"⏳ {modelo} indisponível ({ultimo[:60]}...)")
+                    tentativa += 1
+                    time.sleep(3 * tentativa)
+        raise ProvedorIndisponivel(ultimo[:200])
+
+    def rodar(self, sistema, conversa, mensagem, chamar, avisar):
+        t = self.types
+        self.config.system_instruction = sistema
+        contents = [t.Content(role="user" if r == "user" else "model", parts=[t.Part(text=x)]) for r, x in conversa]
+        contents.append(t.Content(role="user", parts=[t.Part(text=mensagem)]))
+        for passo in range(1, MAX_PASSOS + 1):
+            avisar(f"🧠 passo {passo}: pensando ({self.modelo})...")
+            resp = self._gerar(contents)
+            conteudo = resp.candidates[0].content if resp.candidates else None
+            if conteudo is None:
+                raise ProvedorIndisponivel("resposta vazia do Gemini")
+            contents.append(conteudo)
+            chamadas = resp.function_calls or []
+            if not chamadas:
+                return resp.text or ""
+            partes = []
+            for fc in chamadas:
+                resultado = chamar(fc.name, dict(fc.args or {}), passo)
+                partes.append(t.Part.from_function_response(name=fc.name, response={"result": resultado}))
+            contents.append(t.Content(role="user", parts=partes))
+        return None
+
+
+class _Groq:
+    nome = "groq"
+
+    def __init__(self, chave: str, avisar):
+        from openai import OpenAI
+        self.client = OpenAI(api_key=chave, base_url="https://api.groq.com/openai/v1", timeout=60, max_retries=1)
+        self.modelo = GROQ_MODELS[0]
+        self.avisar = avisar
+        self.tools = [_schema_openai(f) for f in FERRAMENTAS]
+
+    def _gerar(self, messages):
+        candidatos = [self.modelo] + [m for m in GROQ_MODELS if m != self.modelo]
+        ultimo = ""
+        for modelo in candidatos:
+            for tentativa in range(2 if modelo == self.modelo else 1):
+                try:
+                    resp = self.client.chat.completions.create(model=modelo, messages=messages, tools=self.tools,
+                                                               tool_choice="auto", temperature=0.2)
+                    if modelo != self.modelo:
+                        self.avisar(f"🔁 Groq: usando {modelo}")
+                        self.modelo = modelo
+                    return resp
+                except Exception as e:
+                    ultimo = str(e)
+                    if any(c in ultimo for c in ("401", "403", "invalid_api_key")):
+                        raise ProvedorIndisponivel(f"chave do Groq inválida: {ultimo[:120]}")
+                    if any(c in ultimo for c in ("404", "model_not_found", "decommissioned", "tool_use_failed")):
+                        self.avisar(f"⏭️ {modelo}: {ultimo[:60]}")
+                        break
+                    self.avisar(f"⏳ {modelo} indisponível ({ultimo[:60]}...)")
                     time.sleep(3 * (tentativa + 1))
-        raise ultimo_erro
+        raise ProvedorIndisponivel(ultimo[:200])
+
+    def rodar(self, sistema, conversa, mensagem, chamar, avisar):
+        messages = [{"role": "system", "content": sistema}]
+        messages += [{"role": "user" if r == "user" else "assistant", "content": x} for r, x in conversa]
+        messages.append({"role": "user", "content": mensagem})
+        for passo in range(1, MAX_PASSOS + 1):
+            avisar(f"🧠 passo {passo}: pensando ({self.modelo})...")
+            msg = self._gerar(messages).choices[0].message
+            if not msg.tool_calls:
+                return msg.content or ""
+            messages.append({"role": "assistant", "content": msg.content or "",
+                             "tool_calls": [{"id": tc.id, "type": "function",
+                                             "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
+                                            for tc in msg.tool_calls]})
+            for tc in msg.tool_calls:
+                try:
+                    args = json.loads(tc.function.arguments or "{}")
+                except json.JSONDecodeError:
+                    resultado = {"erro": "argumentos em JSON inválido; tente de novo"}
+                else:
+                    resultado = chamar(tc.function.name, args, passo)
+                messages.append({"role": "tool", "tool_call_id": tc.id,
+                                 "content": json.dumps(resultado, ensure_ascii=False, default=str)})
+        return None
+
+
+# ----------------------------------------------------------------------- agente
+class AgenteCicloZero:
+    def __init__(self, api_key: str | None = None, groq_key: str | None = None):
+        criar_tabelas()
+        self.ao_passo = None  # callback opcional para mostrar o progresso (terminal/Streamlit)
+        self.sessao = uuid.uuid4().hex[:8]
+        self.conversa: list[tuple[str, str]] = []  # turnos já concluídos (texto), comum a todos os provedores
+        chaves = {"gemini": api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"),
+                  "groq": groq_key or os.getenv("GROQ_API_KEY")}
+        classes = {"gemini": _Gemini, "groq": _Groq}
+        self.provedores = []
+        for nome in PROVEDORES:
+            if chaves.get(nome) and nome in classes:
+                try:
+                    self.provedores.append(classes[nome](chaves[nome], self._avisar))
+                except ImportError as e:
+                    print(f"[aviso] provedor {nome} sem biblioteca instalada ({e}); rode pip install -r requirements.txt")
+        if not self.provedores:
+            raise RuntimeError("Nenhum provedor configurado: defina GEMINI_API_KEY e/ou GROQ_API_KEY no arquivo .env")
+
+    @property
+    def modelo(self) -> str:
+        return " → ".join(f"{p.nome}:{p.modelo}" for p in self.provedores)
 
     def _avisar(self, texto: str) -> None:
         if self.ao_passo:
             self.ao_passo(texto)
 
+    def _sistema(self) -> str:
+        hoje = date.today()
+        return INSTRUCOES.format(hoje=hoje.strftime("%d/%m/%Y"), dia_semana=_DIAS[hoje.weekday()])
+
     def perguntar(self, mensagem: str) -> dict:
         """Processa uma mensagem e devolve {'resposta': str, 'passos': [chamadas de ferramenta]}."""
         passos: list[dict] = []
         _log(self.sessao, 0, "usuario", mensagem)
-        self.historico.append(types.Content(role="user", parts=[types.Part(text=mensagem)]))
-        for passo in range(1, MAX_PASSOS + 1):
-            self._avisar(f"🧠 passo {passo}: pensando...")
+
+        def chamar(nome, args, passo):
+            self._avisar(f"🔧 {nome}({args})")
+            resultado = _datas_br(_executar(nome, args))
+            passos.append({"ferramenta": nome, "argumentos": args, "resultado": resultado})
+            _log(self.sessao, passo, "ferramenta", {"nome": nome, "args": args, "resultado": resultado})
+            return resultado
+
+        erro = ""
+        for i, prov in enumerate(self.provedores):
+            if i > 0:
+                self._avisar(f"🔁 trocando para o provedor {prov.nome}")
             try:
-                resp = self._gerar(self.historico)
-            except Exception as e:
-                _log(self.sessao, passo, "erro", str(e))
-                return {"resposta": f"⚠️ Não consegui falar com o modelo agora ({e}). Tente de novo em instantes.",
+                texto = prov.rodar(self._sistema(), self.conversa[-10:], mensagem, chamar, self._avisar)
+            except ProvedorIndisponivel as e:
+                erro = f"{prov.nome}: {e}"
+                _log(self.sessao, len(passos), "erro", erro)
+                if any(p["ferramenta"] in FERRAMENTAS_QUE_ALTERAM for p in passos):
+                    return {"resposta": "⚠️ O modelo caiu no meio da tarefa, depois de já ter alterado o estoque. "
+                                        "Confira a aba Estoque antes de repetir o pedido.", "passos": passos}
+                continue
+            if texto is None:
+                _log(self.sessao, MAX_PASSOS, "erro", "limite de passos atingido")
+                return {"resposta": "⚠️ Atingi o limite de passos para esta pergunta. Pode reformular de forma mais específica?",
                         "passos": passos}
-            conteudo = resp.candidates[0].content if resp.candidates else None
-            if conteudo is None:
-                return {"resposta": "⚠️ O modelo não retornou resposta.", "passos": passos}
-            self.historico.append(conteudo)
-            chamadas = resp.function_calls or []
-            if not chamadas:
-                texto = resp.text or ""
-                _log(self.sessao, passo, "resposta", texto)
-                return {"resposta": texto, "passos": passos}
-            partes = []
-            for fc in chamadas:
-                args = dict(fc.args or {})
-                self._avisar(f"🔧 {fc.name}({args})")
-                resultado = _datas_br(_executar(fc.name, args))
-                passos.append({"ferramenta": fc.name, "argumentos": args, "resultado": resultado})
-                _log(self.sessao, passo, "ferramenta", {"nome": fc.name, "args": args, "resultado": resultado})
-                partes.append(types.Part.from_function_response(name=fc.name, response={"result": resultado}))
-            self.historico.append(types.Content(role="user", parts=partes))
-        _log(self.sessao, MAX_PASSOS, "erro", "limite de passos atingido")
-        return {"resposta": "⚠️ Atingi o limite de passos para esta pergunta. Pode reformular de forma mais específica?",
+            _log(self.sessao, len(passos) + 1, "resposta", f"[{prov.nome}:{prov.modelo}] {texto}")
+            self.conversa += [("user", mensagem), ("assistant", texto)]
+            return {"resposta": texto, "passos": passos, "modelo": f"{prov.nome}:{prov.modelo}"}
+        return {"resposta": f"⚠️ Nenhum modelo de IA respondeu agora ({erro}). Tente de novo em instantes.",
                 "passos": passos}
 
     def rotina_diaria(self) -> dict:
@@ -201,7 +346,7 @@ class AgenteCicloZero:
 if __name__ == "__main__":
     agente = AgenteCicloZero()
     agente.ao_passo = lambda t: print("   " + t, flush=True)
-    print(f"Modelo: {agente.modelo}")
+    print(f"Provedores: {agente.modelo}")
     print("Ciclo Zero — digite 'rotina' para a rotina diária ou 'sair'.")
     while True:
         msg = input("\nVocê: ").strip()
