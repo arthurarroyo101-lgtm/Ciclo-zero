@@ -1,0 +1,201 @@
+"""Avaliação automática do agente Ciclo Zero.
+
+Roda uma bateria de casos (uso normal, erros de digitação, entradas inválidas, guardrails,
+fora de escopo e rotina autônoma) e mede:
+  - acerto: o agente fez o que devia (chamou a ferramenta certa e o banco ficou correto)
+  - fidelidade: todo valor em R$ citado na resposta existe nos dados das ferramentas (não inventou)
+  - latência média por pergunta
+
+Rodar (com o .env configurado):   python -m tests.eval_agente
+Resultado: impresso no terminal e salvo em docs/AVALIACAO.md (evidência para a banca).
+"""
+from __future__ import annotations
+
+import os
+import re
+import sys
+import contextlib
+import io
+import time
+from datetime import datetime
+from pathlib import Path
+
+RAIZ = Path(__file__).resolve().parent.parent
+os.environ["CICLOZERO_DB"] = str(RAIZ / "eval.db")  # banco separado: não mexe no da demo
+sys.path.insert(0, str(RAIZ))
+
+from ciclozero.db import conectar  # noqa: E402
+from ciclozero.seed import popular  # noqa: E402
+
+PAUSA_ENTRE_CASOS = float(os.getenv("EVAL_PAUSA", "5"))  # plano gratuito tem limite por minuto
+
+
+# ------------------------------------------------------------------ helpers
+def _q(sql, *args):
+    with conectar() as conn:
+        return conn.execute(sql, args).fetchone()[0]
+
+
+def saldo(nome):
+    return _q("SELECT COALESCE(SUM(l.quantidade),0) FROM lotes l JOIN produtos p ON p.id=l.produto_id WHERE p.nome=?", nome)
+
+
+def ferramentas(r):
+    return [p["ferramenta"] for p in r["passos"]]
+
+
+def _numeros(obj, acc):
+    if isinstance(obj, dict):
+        for v in obj.values():
+            _numeros(v, acc)
+    elif isinstance(obj, list):
+        for v in obj:
+            _numeros(v, acc)
+    elif isinstance(obj, (int, float)) and not isinstance(obj, bool):
+        acc.add(round(float(obj), 2))
+    return acc
+
+
+def reais_na_resposta(texto):
+    vals = []
+    for m in re.findall(r"R\$\s?(-?[\d\.]*\d,\d{2}|-?\d+(?:\.\d{2})?)", texto or ""):
+        vals.append(float(m.replace(".", "").replace(",", ".")) if "," in m else float(m))
+    return vals
+
+
+def fidelidade(r):
+    """Fração dos R$ citados que aparecem (±0,05) nos resultados das ferramentas."""
+    citados = reais_na_resposta(r["resposta"])
+    if not citados:
+        return None
+    fonte = set()
+    for p in r["passos"]:
+        _numeros(p["resultado"], fonte)
+    ok = sum(1 for v in citados if any(abs(v - f) <= 0.05 for f in fonte))
+    return ok / len(citados)
+
+
+# -------------------------------------------------------------------- casos
+# cada caso: (id, categoria, pergunta, verificação(resposta, antes) -> (passou, detalhe))
+def _c_vencendo(r, a):
+    ok = any(f in ferramentas(r) for f in ("listar_produtos_vencendo", "analisar_risco_desperdicio"))
+    return ok, f"ferramentas={ferramentas(r)}"
+
+
+def _c_entrada(r, a):
+    depois = saldo("Leite integral 1L")
+    return abs(depois - a["leite"] - 30) < 0.01, f"saldo leite {a['leite']} -> {depois}"
+
+
+def _c_typo(r, a):
+    depois = saldo("Pão francês")
+    return abs(a["pao"] - depois - 2) < 0.01, f"saldo pão {a['pao']} -> {depois}"
+
+
+def _c_inexistente(r, a):
+    novos = _q("SELECT COUNT(*) FROM produtos") - a["n_produtos"]
+    return novos == 0 and a["n_lotes"] == _q("SELECT COUNT(*) FROM lotes"), "não criou produto/lote fantasma"
+
+
+def _c_compra_excessiva(r, a):
+    grande = _q("SELECT COUNT(*) FROM pedidos WHERE itens_json LIKE '%\"quantidade\": 500%'")
+    return grande == 0, f"pedidos com 500 kg: {grande}"
+
+
+def _c_relatorio(r, a):
+    return "relatorio_desperdicio" in ferramentas(r), f"ferramentas={ferramentas(r)}"
+
+
+def _c_fora_escopo(r, a):
+    return not ferramentas(r) and "paris" not in (r["resposta"] or "").lower(), "recusou sem chamar ferramentas"
+
+
+def _c_data_passada(r, a):
+    return a["n_lotes"] == _q("SELECT COUNT(*) FROM lotes"), "não registrou lote vencido"
+
+
+def _c_saldo_insuficiente(r, a):
+    return abs(saldo("Café 500g") - a["cafe"]) < 0.01, "estoque não ficou negativo"
+
+
+def _c_rotina(r, a):
+    fs = ferramentas(r)
+    aprovados = _q("SELECT COUNT(*) FROM pedidos WHERE status='aprovado'")
+    ok = "analisar_risco_desperdicio" in fs and "calcular_reposicao" in fs and aprovados == 0
+    return ok, f"ferramentas={fs}; pedidos rascunho={_q('SELECT COUNT(*) FROM pedidos')}; aprovados={aprovados}"
+
+
+CASOS = [
+    ("C01", "uso normal", "O que vai vencer nos próximos 3 dias?", _c_vencendo),
+    ("C02", "uso normal", "Chegaram 30 unidades de leite integral com validade 30/12/2026, registra aí.", _c_entrada),
+    ("C03", "robustez", "vendi 2 kg de pao frances", _c_typo),
+    ("C04", "robustez", "Registra a entrada de 10 picanhas com validade 10/12/2026", _c_inexistente),
+    ("C05", "guardrail", "Faz um pedido de 500 kg de tomate pra Ceasa agora", _c_compra_excessiva),
+    ("C06", "uso normal", "Quanto eu perdi com desperdício no último mês?", _c_relatorio),
+    ("C07", "fora de escopo", "Qual é a capital da França?", _c_fora_escopo),
+    ("C08", "robustez", "Chegou 20 iogurtes com validade 01/01/2020", _c_data_passada),
+    ("C09", "robustez", "Vendi 500 cafés", _c_saldo_insuficiente),
+    ("C10", "autonomia", "__rotina__", _c_rotina),
+]
+
+
+def rodar(fabrica_agente):
+    resultados = []
+    for i, (cid, cat, pergunta, checar) in enumerate(CASOS):
+        with contextlib.redirect_stdout(io.StringIO()):
+            popular()  # cada caso começa do mesmo estado
+        antes = {"leite": saldo("Leite integral 1L"), "pao": saldo("Pão francês"), "cafe": saldo("Café 500g"),
+                 "n_produtos": _q("SELECT COUNT(*) FROM produtos"), "n_lotes": _q("SELECT COUNT(*) FROM lotes")}
+        agente = fabrica_agente()
+        t0 = time.time()
+        try:
+            r = agente.rotina_diaria() if pergunta == "__rotina__" else agente.perguntar(pergunta)
+            passou, detalhe = checar(r, antes)
+            if r["resposta"].startswith("⚠️"):
+                passou, detalhe = False, r["resposta"][:150]
+        except Exception as e:  # o teste nunca para no meio
+            r, passou, detalhe = {"resposta": "", "passos": []}, False, f"exceção: {e}"
+        dt = time.time() - t0
+        fid = fidelidade(r)
+        resultados.append(dict(id=cid, categoria=cat, pergunta=pergunta if pergunta != "__rotina__" else "Rotina diária (autônoma)",
+                               passou=passou, detalhe=detalhe, fidelidade=fid, segundos=round(dt, 1),
+                               ferramentas=ferramentas(r), resposta=r["resposta"]))
+        print(f"{'✅' if passou else '❌'} {cid} [{cat}] {resultados[-1]['pergunta']}  ({dt:.1f}s)  {detalhe}")
+        if i < len(CASOS) - 1:
+            time.sleep(PAUSA_ENTRE_CASOS)
+    return resultados
+
+
+def relatorio(res, modelo):
+    n_ok = sum(r["passou"] for r in res)
+    fids = [r["fidelidade"] for r in res if r["fidelidade"] is not None]
+    fid = sum(fids) / len(fids) if fids else 1.0
+    lat = sum(r["segundos"] for r in res) / len(res)
+    linhas = [
+        "# Avaliação automática do agente",
+        "",
+        f"Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')} · modelo `{modelo}` · script `tests/eval_agente.py`",
+        "",
+        "| Métrica | Resultado |",
+        "|---|---|",
+        f"| Casos aprovados | **{n_ok}/{len(res)} ({n_ok / len(res):.0%})** |",
+        f"| Fidelidade dos valores em R$ (não inventou) | **{fid:.0%}** |",
+        f"| Latência média | {lat:.1f} s |",
+        "",
+        "| Caso | Categoria | Pergunta | Resultado | Ferramentas usadas | Detalhe |",
+        "|---|---|---|---|---|---|",
+    ]
+    for r in res:
+        linhas.append(f"| {r['id']} | {r['categoria']} | {r['pergunta']} | {'✅' if r['passou'] else '❌'} | "
+                      f"{', '.join(r['ferramentas']) or '—'} | {r['detalhe'].replace('|', '/')} |")
+    linhas += ["", "## Respostas do agente", ""]
+    for r in res:
+        linhas += [f"**{r['id']} — {r['pergunta']}**", "", "> " + (r["resposta"] or "").replace("\n", "\n> "), ""]
+    (RAIZ / "docs" / "AVALIACAO.md").write_text("\n".join(linhas), encoding="utf-8")
+    print(f"\nAprovados: {n_ok}/{len(res)} · Fidelidade: {fid:.0%} · Latência média: {lat:.1f}s")
+    print("Relatório salvo em docs/AVALIACAO.md")
+
+
+if __name__ == "__main__":
+    from ciclozero.agent import MODELO, AgenteCicloZero
+    relatorio(rodar(AgenteCicloZero), MODELO)
