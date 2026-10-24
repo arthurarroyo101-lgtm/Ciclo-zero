@@ -122,8 +122,15 @@ class AgenteCicloZero:
                 msg = str(e)
                 # modelo que não aceita nível de raciocínio: tira a opção e tenta de novo
                 if "thinking" in msg.lower() and self.config.thinking_config is not None:
-                    self.config.thinking_config = None
-                    self._avisar("ℹ️ modelo não aceita nível de raciocínio; seguindo sem ele")
+                    tc = self.config.thinking_config
+                    if tc.thinking_level is not None:
+                        # modelos 2.x usam "orçamento" de raciocínio em vez de nível: 0 = mais rápido
+                        orcamento = {"minimal": 0, "low": 512, "medium": 2048}.get(NIVEL_RACIOCINIO, -1)
+                        self.config.thinking_config = types.ThinkingConfig(thinking_budget=orcamento)
+                        self._avisar(f"ℹ️ modelo usa orçamento de raciocínio; usando {orcamento}")
+                    else:
+                        self.config.thinking_config = None
+                        self._avisar("ℹ️ modelo não aceita configurar raciocínio; seguindo sem")
                     continue
                 # erro de configuração (modelo inexistente, chave inválida): não adianta tentar de novo
                 if tentativa == 3 or any(c in msg for c in ("404", "401", "403", "API key", "INVALID_ARGUMENT")):
