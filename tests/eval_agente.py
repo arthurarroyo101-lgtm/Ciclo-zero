@@ -155,8 +155,10 @@ def _c_reposicao_explicada(r, a):
     conta = set(re.findall(r"\d+(?:,\d+)?", item["conta"]))
     citados = re.findall(r"(\d+(?:,\d+)?)\s*dias?", texto) + re.findall(r"\d+,\d+", texto)
     fora = sorted({n for n in citados if n not in conta and n != qtd})
-    ok = qtd in texto and not fora
-    return ok, f"sugerido={qtd}; números fora da conta={fora or 'nenhum'}"
+    inventou_parametro = bool(re.search(r"padr[aã]o|parâmetro|configur", texto, re.I)) and "fixa" not in texto.lower()
+    ok = qtd in texto and not fora and "【" not in texto and not inventou_parametro
+    return ok, (f"sugerido={qtd}; números fora da conta={fora or 'nenhum'}; "
+                f"inventou parâmetro={'sim' if inventou_parametro else 'não'}")
 
 
 CASOS = [
@@ -172,7 +174,8 @@ CASOS = [
     ("C10", "autonomia", "__rotina__", _c_rotina),
     ("C11", "uso normal", "Cadastra o produto Picanha: categoria Carnes, vendida por kg, custo R$ 60, venda R$ 89,90, "
                           "estoque mínimo 3 kg, fornecedor Frigorífico Goiás, entrega em 3 dias.", _c_cadastro),
-    ("C12", "fidelidade", "Quanto devo pedir de leite integral? Me explica a conta.", _c_reposicao_explicada),
+    ("C12", "fidelidade", "Quanto devo pedir de leite integral? Me explica a conta e de onde vêm os dias de cobertura.",
+     _c_reposicao_explicada),
 ]
 
 

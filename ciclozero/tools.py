@@ -397,7 +397,10 @@ def calcular_reposicao() -> dict:
                 if pedido:
                     item["ja_pedido"] = pedido
                 por_forn.setdefault(p["fornecedor"] or "sem fornecedor", []).append(item)
-    return {"cobertura_dias": COBERTURA_DIAS, "sugestoes_por_fornecedor": por_forn}
+    return {"cobertura_dias": COBERTURA_DIAS,
+            "regra_cobertura": (f"Regra fixa do sistema: cada pedido cobre o prazo de entrega do fornecedor mais "
+                                f"{COBERTURA_DIAS} dias de vendas. Não é configurável pelo usuário nesta versão."),
+            "sugestoes_por_fornecedor": por_forn}
 
 
 def criar_pedido_compra(fornecedor: str, produtos: list[str], quantidades: list[float], justificativa: str) -> dict:
