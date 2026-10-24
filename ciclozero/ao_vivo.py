@@ -100,6 +100,76 @@ def _reais(v: float) -> str:
     return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+_CARTOES_HTML = """
+<style>
+  :root { --fundo:#ffffff; --borda:#e3e7ea; --texto:#1f2328; --sub:#5f6368; }
+  @media (prefers-color-scheme: dark) { :root.auto { --fundo:#1b1f24; --borda:#30363d; --texto:#f0f3f6; --sub:#9aa4ae; } }
+  :root.dark { --fundo:#1b1f24; --borda:#30363d; --texto:#f0f3f6; --sub:#9aa4ae; }
+  html, body { margin:0; padding:0; background:transparent; font-family:"Source Sans Pro","Source Sans 3",system-ui,sans-serif; }
+  .grade { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:10px; }
+  .cartao { background:var(--fundo); border:1px solid var(--borda); border-radius:12px; padding:10px 12px; min-width:0; }
+  .rotulo { color:var(--sub); font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .valor { color:var(--texto); font-size:clamp(18px, 2.3vw, 30px); font-weight:700; line-height:1.25; font-variant-numeric:tabular-nums;
+           white-space:nowrap; transition:color .4s; }
+  .delta { font-size:13px; font-weight:600; border-radius:999px; padding:1px 8px; display:inline-block; margin-top:2px;
+           opacity:0; transition:opacity .3s; }
+  .delta.mostra { opacity:1; }
+  .bom { color:#1a7f37; background:rgba(46,160,67,.15); } .ruim { color:#cf222e; background:rgba(248,81,73,.15); }
+  .neutro { color:var(--sub); background:transparent; opacity:1; }
+  .pisca-bom { color:#2ea043 !important; } .pisca-ruim { color:#f85149 !important; }
+</style>
+<div class="grade" id="g"></div>
+<script>
+document.documentElement.className = "__TEMA__";
+const CARTOES = __DADOS__;
+const fmtR = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'});
+const fmt = (c, v) => c.tipo === 'reais' ? fmtR.format(v) : Math.round(v).toLocaleString('pt-BR');
+const g = document.getElementById('g');
+CARTOES.forEach((c, i) => {
+  const d = c.para - c.de;
+  let cls = 'neutro', txt = c.nota || '';
+  if (Math.abs(d) > 1e-9) {
+    const melhorou = c.menor_melhor ? d < 0 : d > 0;
+    cls = melhorou ? 'bom' : 'ruim';
+    txt = (d > 0 ? '▲ ' : '▼ ') + (c.tipo === 'reais' ? fmtR.format(Math.abs(d)) : Math.abs(Math.round(d)));
+  }
+  g.insertAdjacentHTML('beforeend',
+    `<div class="cartao"><div class="rotulo">${c.rotulo}</div>
+       <div class="valor" id="v${i}">${fmt(c, c.de)}</div>
+       <div class="delta ${cls}" id="d${i}">${txt || '&nbsp;'}</div></div>`);
+});
+const t0 = performance.now(), DUR = 1100;
+const ease = t => 1 - Math.pow(1 - t, 3);
+function quadro(agora) {
+  const p = Math.min(1, (agora - t0) / DUR);
+  CARTOES.forEach((c, i) => {
+    const el = document.getElementById('v' + i);
+    el.textContent = fmt(c, c.de + (c.para - c.de) * ease(p));
+    if (p < 1 && c.para !== c.de) el.classList.add((c.menor_melhor ? c.para < c.de : c.para > c.de) ? 'pisca-bom' : 'pisca-ruim');
+    if (p >= 1) el.classList.remove('pisca-bom', 'pisca-ruim');
+  });
+  if (p < 1) requestAnimationFrame(quadro);
+}
+requestAnimationFrame(quadro);
+setTimeout(() => CARTOES.forEach((c, i) => document.getElementById('d' + i).classList.add('mostra')), 150);
+</script>
+"""
+
+
+def _cartoes(cartoes: list[dict]) -> None:
+    """Cartões com contagem animada do valor anterior até o atual (≈1 s)."""
+    import json as _json
+
+    import streamlit.components.v1 as components
+    import streamlit as st
+    try:  # segue o tema escolhido no Streamlit (claro/escuro); se não der para saber, segue o navegador
+        tema = st.context.theme.type or "auto"
+    except Exception:
+        tema = "auto"
+    html = _CARTOES_HTML.replace("__DADOS__", _json.dumps(cartoes, ensure_ascii=False)).replace("__TEMA__", tema)
+    components.html(html, height=118)
+
+
 def controles() -> None:
     """Botão liga/desliga na barra lateral."""
     import streamlit as st
@@ -129,21 +199,20 @@ def painel() -> None:
                  "perda": risco["resumo"]["perda_total_sem_acao_rs"], "fat": hoje["faturamento_rs"],
                  "vendas": hoje["vendas"]}
 
-        def delta(chave, dinheiro=True):
-            if chave not in anterior or anterior[chave] == atual[chave]:
-                return None
-            d = atual[chave] - anterior[chave]
-            return (("+" if d > 0 else "−") + _reais(abs(d))[3:]) if dinheiro else f"{d:+g}"
-
         if sim.ativo:
             st.markdown("🟢 **Loja ao vivo** — *simulação de vendas do caixa; números atualizando em tempo real*")
-        c1, c2, c3, c4, c5 = st.columns(5)
-        c1.metric("Vendas hoje", _reais(hoje["faturamento_rs"]), delta("fat"))
-        c2.metric("Lotes em risco (5 dias)", atual["lotes"], delta("lotes", False), delta_color="inverse")
-        c3.metric("R$ em risco (3 dias)", _reais(atual["em_risco"]), delta("em_risco"), delta_color="inverse")
-        c4.metric("Perda projetada sem ação", _reais(atual["perda"]), delta("perda"), delta_color="inverse")
-        c5.metric("Perdas últimos 30 dias", _reais(perdas["total_perdas_rs"]),
-                  perdas["perdas_sobre_faturamento"] + " do faturamento", delta_color="off")
+        de = lambda k: anterior.get(k, atual[k])
+        _cartoes([
+            {"rotulo": "Vendas hoje", "tipo": "reais", "de": de("fat"), "para": atual["fat"]},
+            {"rotulo": "Lotes em risco · 5 dias", "tipo": "int", "de": de("lotes"), "para": atual["lotes"],
+             "menor_melhor": True},
+            {"rotulo": "R$ em risco · 3 dias", "tipo": "reais", "de": de("em_risco"), "para": atual["em_risco"],
+             "menor_melhor": True},
+            {"rotulo": "Perda se nada for feito", "tipo": "reais", "de": de("perda"), "para": atual["perda"],
+             "menor_melhor": True},
+            {"rotulo": "Perdas · 30 dias", "tipo": "reais", "de": perdas["total_perdas_rs"],
+             "para": perdas["total_perdas_rs"], "nota": perdas["perdas_sobre_faturamento"].replace(".", ",") + " do faturamento"},
+        ])
         if sim.ativo and sim.eventos:
             st.caption("🧾 Últimas vendas: " + " · ".join(
                 f"{e['hora']} {e['quantidade']:g} {e['unidade']} {e['produto']}" for e in list(sim.eventos)[:5]))
