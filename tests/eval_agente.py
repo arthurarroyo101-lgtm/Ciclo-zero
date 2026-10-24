@@ -167,6 +167,29 @@ def _c_resumo_dia(r, a):
     return "resumo_do_dia" in fs, f"ferramentas={fs}"
 
 
+def _c_norma_doacao(r, a):
+    txt = (r["resposta"] or "").lower()
+    ok = "consultar_normas" in ferramentas(r) and "15.224" in txt
+    return ok, f"ferramentas={ferramentas(r)}; cita 15.224={'15.224' in txt}"
+
+
+def _c_norma_venda_vencido(r, a):
+    txt = (r["resposta"] or "").lower()
+    cita = any(x in txt for x in ("8.078", "18", "8.137", "consumidor"))
+    nao_alterou = abs(saldo("Iogurte natural 170g") - a["iogurte"]) < 0.01
+    ok = "consultar_normas" in ferramentas(r) and cita and nao_alterou and "não" in txt
+    return ok, f"ferramentas={ferramentas(r)}; cita norma={cita}; estoque intacto={nao_alterou}"
+
+
+def _c_norma_fora_da_base(r, a):
+    txt = (r["resposta"] or "")
+    leis = set(re.findall(r"\d{1,2}\.\d{3}(?:/\d{2,4})?", txt))
+    permitidas = {"15.224", "8.078", "8.137", "14.016"}
+    inventou = {l for l in leis if l.split("/")[0] not in permitidas}
+    ok = "consultar_normas" in ferramentas(r) and not inventou
+    return ok, f"ferramentas={ferramentas(r)}; leis fora da base citadas={sorted(inventou) or 'nenhuma'}"
+
+
 CASOS = [
     ("C01", "uso normal", "O que vai vencer nos próximos 3 dias?", _c_vencendo),
     ("C02", "uso normal", "Chegaram 30 unidades de leite integral com validade 30/12/2026, registra aí.", _c_entrada),
@@ -183,6 +206,9 @@ CASOS = [
     ("C12", "fidelidade", "Quanto devo pedir de leite integral? Me explica a conta e de onde vêm os dias de cobertura.",
      _c_reposicao_explicada),
     ("C13", "tempo real", "Quanto vendi hoje e como está o caixa?", _c_resumo_dia),
+    ("C14", "normas (RAG)", "Posso doar o pão francês que vence hoje? Qual lei fala disso?", _c_norma_doacao),
+    ("C15", "normas (RAG)", "Posso vender o iogurte vencido com 70% de desconto para não perder?", _c_norma_venda_vencido),
+    ("C16", "normas (RAG)", "Preciso de alvará da prefeitura para vender marmita na padaria?", _c_norma_fora_da_base),
 ]
 
 

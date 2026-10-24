@@ -45,6 +45,7 @@ foto da nota ──► modelo de visão (Gemini; reserva: Groq/Llama 4) ──�
 | Ferramenta | O que faz |
 |---|---|
 | `resumo_do_dia` | Dinheiro de hoje em tempo real: vendas, caixa, lucro, despesas, compras, perdas, compras em excesso, a pagar |
+| `consultar_normas` | **RAG normativo**: busca trechos de lei conferidos (doação, venda de vencido, responsabilidade) e devolve norma, artigo e link; se não achar, o agente diz que não sabe |
 | `consultar_estoque` | Saldo, validade mais próxima, média de vendas/dia, abaixo do mínimo |
 | `cadastrar_produto` | Cadastra produto novo com os dados que o usuário informar (bloqueia duplicado e nome parecido; nunca inventa preço) |
 | `registrar_entrada` | Novo lote com validade (valida data e quantidade) |
@@ -63,6 +64,11 @@ foto da nota ──► modelo de visão (Gemini; reserva: Groq/Llama 4) ──�
 4. O ciclo repete até a resposta final (máximo de 8 passos).
 
 **Exemplo — rotina diária (2 passos, ~25 s):** `analisar_risco_desperdicio` + `criar_pedidos_sugeridos` (em paralelo) → resposta com plano por lote, pedidos criados e resumo (perda sem ação, receita recuperada com promoções, valor doado).
+
+## De onde vêm os fatos (RAG)
+- **Números** (estoque, vendas, R$, validades): do banco SQLite, via ferramentas — nunca do modelo.
+- **Regras legais** (pode doar? pode vender vencido?): da base normativa `docs/NORMAS.md`, com trechos conferidos no site oficial, citados com lei, artigo e link. Pergunta fora da base → "não sei; consulte a vigilância sanitária ou um advogado". Testado nos casos C14–C16 (inclusive pergunta fora da base, que reprova se o agente citar qualquer lei que não esteja na base).
+- Ações da análise já trazem a **base legal**: doação → Lei 15.224/2025, art. 14 (dentro da validade); descarte de vencido → CDC art. 18 §6º I e Lei 8.137/1990 art. 7º IX. Produto vencido nunca vai para promoção nem doação.
 
 ## Guardrails e confiabilidade
 | Risco | Como tratamos |
@@ -89,7 +95,7 @@ O painel "Saúde do agente" mostra tempo médio e **p95**, taxa de erro do model
 
 **Como investigamos uma resposta ruim:** abrimos o Rastreio, achamos a sessão, vemos exatamente quais dados as ferramentas devolveram e o que o modelo respondeu. Se o número estava certo na ferramenta e errado na resposta, é problema de instrução (ajustamos o prompt e rodamos `tests/eval_agente.py`); se estava errado na ferramenta, é bug de código.
 
-**Sinais de degradação:** p95 subindo, taxa de erro do modelo subindo, mais trocas para reserva, mais erros de ferramenta por pergunta. Antes de qualquer mudança, rodamos a avaliação automática (13 casos) para garantir que nada piorou.
+**Sinais de degradação:** p95 subindo, taxa de erro do modelo subindo, mais trocas para reserva, mais erros de ferramenta por pergunta. Antes de qualquer mudança, rodamos a avaliação automática (16 casos) para garantir que nada piorou.
 
 ## Por que um agente só (e não vários)?
 O fluxo do pequeno comércio é **sequencial e de um domínio só** (estoque → risco → ação → compra). Dividir em vários agentes (ex.: "agente de validade" + "agente de compras" + "coordenador") traria:

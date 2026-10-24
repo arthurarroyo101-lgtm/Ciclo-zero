@@ -29,6 +29,7 @@ Testes: `python -m tests.eval_agente` (agente, precisa de chave) e `python -m te
 - [Roteiro do pitch](docs/PITCH.md)
 - [Validação com comerciantes](docs/validacao.md)
 - [Avaliação automática do agente](docs/AVALIACAO.md)
+- [Base normativa (RAG) — leis conferidas](docs/NORMAS.md)
 - [Fluxo do agente (inputs, lógica, outputs)](docs/FLUXO_AGENTE.md)
 
 ## Licença

@@ -74,12 +74,14 @@ ciclozero/nota_fiscal.py → leitura multimodal da nota fiscal (visão) + verifi
 ciclozero/ui_nota.py    → aba 📷 Nota fiscal
 ciclozero/ao_vivo.py    → simulador de vendas do caixa + painel em tempo real
 ciclozero/seed.py       → padaria fictícia com 30 dias de histórico
-tests/eval_agente.py    → avaliação automática (13 casos) → docs/AVALIACAO.md
+tests/eval_agente.py    → avaliação automática (16 casos)
+ciclozero/normas.py     → base normativa (RAG) com leis conferidas → docs/AVALIACAO.md
 docs/                   → DECISOES, TAREFAS, FLUXO_AGENTE, DEMO, AVALIACAO
 ```
 Decisões de projeto: cálculos em Python (não no LLM) para evitar número inventado; FEFO na baixa de estoque; pedido de compra sempre como rascunho com aprovação humana; pedido > 2× o sugerido é bloqueado e reposição desconta pedidos em aberto; desconto máximo 50%; travas contra "contornar" recusas e contra confundir chegada com saída; máximo 8 passos por pergunta; troca automática de modelo/provedor.
 
 ## Log
+- **2026-10-24 10:35** — **RAG normativo** (único módulo da seção 10 do edital que faltava: "de onde vêm os fatos e como evita informação inventada", consultando legislação). Base `ciclozero/normas.py` + `docs/NORMAS.md` com trechos **conferidos no Planalto**: Lei 15.224/2025 (doação: arts. 1º-3º, 6º-7º, 9º, 14-17, 19-20), CDC art. 18 §6º, Lei 8.137/1990 art. 7º IX. **Descoberta:** a Lei 14.016/2020 (a mais citada sobre doação) foi revogada pela 15.224/2025. RDC ANVISA 216 ficou fora (texto oficial não acessado). Ferramenta `consultar_normas` (busca por palavras-chave, limiar de relevância; fora da base → "não sei"). Regras: vencido nunca vai para promoção/doação; nunca citar lei fora da ferramenta. Ações de doação/descarte trazem `base_legal`. Avaliação: +3 casos (C14 doação, C15 venda de vencido, C16 pergunta fora da base) = 16 casos.
 - **2026-10-24 10:12** — ✅ Fluxo nota → alerta confirmado com IA real: o agente aponta banana e alface com sobra e sugere promoção. Mensagem pós-nota agora pede, por produto, a sobra prevista, o R$ em risco e o preço promocional.
 - **2026-10-24 10:10** — Bug achado no teste da nota com IA real: depois de horas de "loja ao vivo", o agente disse que 40 kg de banana não estavam em risco. O agente estava certo (a ferramenta devolveu 0 lotes); a causa era a **média de vendas incluir o dia corrente** — a simulação acelerada inflou a média. Correção: previsão usa só **dias fechados** (prática padrão; o dia em andamento distorce). Conferido no banco real: banana 40 kg → ~35 kg de sobra. Números do roteiro inalterados (R$ 1.284,80 / R$ 490,05). Tabela da nota: "None" → "(não cadastrado)".
 - **2026-10-24 10:00** — ✅ **Leitura da nota fiscal testada com IA real** (Ceasa: fornecedor, nº, total e 5 itens corretos; soma conferida). Ajustes: bancos migrados ficaram com validade padrão de 7 dias para todos → migração agora preenche os valores reais dos produtos de exemplo; tabela da nota em padrão brasileiro (R$ 3,50, confiança em %, sem "None"). Chave do Groq da demo trocada por uma nova (a antiga estava no limite).

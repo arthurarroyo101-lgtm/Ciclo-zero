@@ -339,6 +339,10 @@ def analisar_risco_desperdicio(dias: int = 5) -> dict:
                 item["abaixo_do_custo"] = item["preco_promocional"] < l["preco_custo"]
             if acao == "doacao":
                 item["quantidade_para_doar"] = sobra
+                item["base_legal"] = "Lei 15.224/2025, art. 14 (doar dentro do prazo de validade)"
+            if acao == "descartar":
+                item["base_legal"] = ("CDC art. 18, § 6º, I (vencido é impróprio ao consumo); "
+                                      "Lei 8.137/1990, art. 7º, IX (vender é crime)")
             resultado.append(item)
     em_risco = [r for r in resultado if r["acao"] != "ok"]
     soma = lambda chave, acao=None: round(sum(r.get(chave, 0) for r in em_risco if acao is None or r["acao"] == acao), 2)
@@ -622,3 +626,18 @@ def resumo_do_dia() -> dict:
 
 # ferramenta financeira (definida mais abaixo no arquivo) também vai para o agente
 FERRAMENTAS.insert(0, resumo_do_dia)
+
+
+def consultar_normas(pergunta: str) -> dict:
+    """Consulta a base de legislação (conferida no site oficial) sobre venda, validade e doação de alimentos.
+    Use SEMPRE que a pergunta envolver lei, norma, regra, multa, crime, se "pode" doar/vender/descartar.
+    Responda citando norma e artigo devolvidos. Se 'encontrado' for false, diga que não sabe — não invente.
+
+    Args:
+        pergunta: a dúvida do usuário, em português (ex.: "posso doar pão que vence hoje?").
+    """
+    from .normas import consultar
+    return consultar(pergunta)
+
+
+FERRAMENTAS.append(consultar_normas)
