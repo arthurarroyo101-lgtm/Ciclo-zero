@@ -25,6 +25,8 @@ Testes: `python -m tests.eval_agente` (agente, precisa de chave) e `python -m te
 Página de apresentação estática em [`landing/`](landing/) (abrir `landing/index.html`; publicação na Vercel em `landing/README.md`).
 
 ## Documentação
+- **[Slides do pitch (PDF)](docs/pitch.pdf)**
+- Resumo para estudar, um por pessoa: [Matheus](docs/estudo/MATHEUS.md), [João Paulo](docs/estudo/JOAO.md), [Arthur](docs/estudo/ARTHUR.md)
 - **[Contexto do projeto](docs/CONTEXTO.md): comece por aqui** (o problema, a ideia, as regras e quem faz o quê). Assistentes de IA: [`AGENTS.md`](AGENTS.md).
 - [Diário de decisões](docs/DECISOES.md)
 - [Divisão de tarefas](docs/TAREFAS.md)
