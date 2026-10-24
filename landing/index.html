@@ -35,7 +35,11 @@
   .btn:active { transform: translateY(1px); }
 
   /* ---------- hero: verde da marca, etiqueta amarela pendurada ---------- */
-  .hero-faixa { background: var(--folha); color: var(--branco); }
+  .hero-faixa { color: var(--branco);
+    background:
+      radial-gradient(60% 70% at 85% 35%, rgba(246,210,60,.28), transparent 60%),
+      radial-gradient(50% 60% at 0% 100%, rgba(220,234,223,.16), transparent 70%),
+      linear-gradient(140deg, #3A7D46 0%, #2F6B3B 40%, #1E4927 100%); }
   .barra { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 20px; }
   .marca { font-family: var(--display); font-weight: 900; font-stretch: 85%; font-size: 24px; text-decoration: none; display: inline-flex; align-items: center; gap: 10px; }
   .marca i { width: 14px; height: 14px; border-radius: 50%; background: var(--etiqueta); display: inline-block; }
@@ -147,11 +151,99 @@
   }
   @media (max-width: 480px) { .passos { grid-template-columns: minmax(0, 1fr); } }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  /* Detalhes disfarçados: desenhos de mercearia em traço fino, quase transparentes, e degradês suaves da paleta */
+  .hero-faixa, .bloco { position: relative; isolation: isolate; overflow: hidden; }
+  .padrao { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+  .p-hero { opacity: .10; -webkit-mask-image: linear-gradient(100deg, transparent 15%, #000 70%); mask-image: linear-gradient(100deg, transparent 15%, #000 70%); }
+  .p-papel { opacity: .07; -webkit-mask-image: linear-gradient(180deg, #000, transparent 85%); mask-image: linear-gradient(180deg, #000, transparent 85%); }
+  .p-escuro { opacity: .05; }
+  .p-fecho { opacity: .07; -webkit-mask-image: linear-gradient(90deg, transparent 30%, #000); mask-image: linear-gradient(90deg, transparent 30%, #000); }
+  .papel { background: linear-gradient(180deg, #EFE6D6 0%, #F6F0E4 100%) !important; }
+  .escuro { background:
+      radial-gradient(55% 80% at 100% 0%, rgba(47,107,59,.55), transparent 70%),
+      linear-gradient(160deg, #1D2B22 0%, #18241C 100%) !important; }
+  .fecho { background: linear-gradient(120deg, #F6D23C 0%, #FFE27A 60%, #F6D23C 100%) !important; }
+  .dor-bloco { background: linear-gradient(180deg, #FFFFFF 0%, #FBF8F2 100%); }
+  .quem .sim { background: linear-gradient(135deg, #DCEADF 0%, #EEF5EF 100%) !important; }
+  .numero { background: linear-gradient(90deg, #F6DDD8 0%, #FBEEEB 100%) !important; }
+  .hero .btn.cheio { background: linear-gradient(180deg, #FFE066, #F6D23C) !important; box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+  .etiqueta { box-shadow: 0 18px 40px rgba(12,30,16,.35); background: linear-gradient(180deg, #FFE066 0%, #F6D23C 45%) !important; }
+  .confianca div { background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,0)); }
+  .passos li { box-shadow: 0 1px 0 rgba(29,43,34,.06), 0 10px 24px rgba(29,43,34,.06); }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <pattern id="mercearia-clara" width="270" height="290" patternUnits="userSpaceOnUse" patternTransform="rotate(-8)">
+      <g stroke="#FFFFFF">
+      <g fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <!-- baguete -->
+        <g transform="translate(18 28) rotate(-28)"><rect x="0" y="0" width="74" height="20" rx="10"/><path d="M18 4l-6 12M34 4l-6 12M50 4l-6 12M64 5l-5 10"/></g>
+        <!-- banana -->
+        <path d="M150 30c4 26 26 44 52 42c-4 8-20 16-36 10c-20-8-28-30-22-52z"/><path d="M150 30l-4-6"/>
+        <!-- garrafa de leite -->
+        <g transform="translate(222 100)"><path d="M8 0h12v8l6 10v34a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V18l6-10z"/><path d="M2 30h24"/></g>
+        <!-- ovo -->
+        <path d="M60 150c-12 0-20 16-20 28s9 20 20 20s20-8 20-20s-8-28-20-28z"/>
+        <!-- maçã -->
+        <g transform="translate(130 130)"><path d="M22 10c-8-6-22-4-22 12c0 14 10 26 18 26c3 0 4-2 6-2s3 2 6 2c8 0 16-12 16-26c0-16-14-18-22-12"/><path d="M24 10c0-6 2-9 6-11"/><path d="M26 6c6-4 12-2 14 2c-6 3-11 2-14-2z"/></g>
+        <!-- nota fiscal -->
+        <g transform="translate(206 196)"><path d="M0 0h40v52l-5-4l-5 4l-5-4l-5 4l-5-4l-5 4l-5-4l-5 4z"/><path d="M8 12h24M8 22h24M8 32h14"/></g>
+        <!-- cenoura -->
+        <g transform="translate(40 232) rotate(-35)"><path d="M0 0l40 10l-40 10z"/><path d="M0 4l-12-8M0 10h-14M0 16l-12 8"/><path d="M14 4l3 6M24 7l3 6"/></g>
+        <!-- pão de forma -->
+        <g transform="translate(118 220)"><path d="M6 18c-8 0-8-16 4-16h26c12 0 12 16 4 16v26H6z"/><path d="M14 26h18"/></g>
+      </g></g>
+    </pattern>
+    <pattern id="mercearia-escura" width="270" height="290" patternUnits="userSpaceOnUse" patternTransform="rotate(-8)">
+      <g stroke="#1D2B22">
+      <g fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <!-- baguete -->
+        <g transform="translate(18 28) rotate(-28)"><rect x="0" y="0" width="74" height="20" rx="10"/><path d="M18 4l-6 12M34 4l-6 12M50 4l-6 12M64 5l-5 10"/></g>
+        <!-- banana -->
+        <path d="M150 30c4 26 26 44 52 42c-4 8-20 16-36 10c-20-8-28-30-22-52z"/><path d="M150 30l-4-6"/>
+        <!-- garrafa de leite -->
+        <g transform="translate(222 100)"><path d="M8 0h12v8l6 10v34a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V18l6-10z"/><path d="M2 30h24"/></g>
+        <!-- ovo -->
+        <path d="M60 150c-12 0-20 16-20 28s9 20 20 20s20-8 20-20s-8-28-20-28z"/>
+        <!-- maçã -->
+        <g transform="translate(130 130)"><path d="M22 10c-8-6-22-4-22 12c0 14 10 26 18 26c3 0 4-2 6-2s3 2 6 2c8 0 16-12 16-26c0-16-14-18-22-12"/><path d="M24 10c0-6 2-9 6-11"/><path d="M26 6c6-4 12-2 14 2c-6 3-11 2-14-2z"/></g>
+        <!-- nota fiscal -->
+        <g transform="translate(206 196)"><path d="M0 0h40v52l-5-4l-5 4l-5-4l-5 4l-5-4l-5 4l-5-4l-5 4z"/><path d="M8 12h24M8 22h24M8 32h14"/></g>
+        <!-- cenoura -->
+        <g transform="translate(40 232) rotate(-35)"><path d="M0 0l40 10l-40 10z"/><path d="M0 4l-12-8M0 10h-14M0 16l-12 8"/><path d="M14 4l3 6M24 7l3 6"/></g>
+        <!-- pão de forma -->
+        <g transform="translate(118 220)"><path d="M6 18c-8 0-8-16 4-16h26c12 0 12 16 4 16v26H6z"/><path d="M14 26h18"/></g>
+      </g></g>
+    </pattern>
+    <pattern id="mercearia-verde" width="270" height="290" patternUnits="userSpaceOnUse" patternTransform="rotate(8)">
+      <g stroke="#2F6B3B">
+      <g fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <!-- baguete -->
+        <g transform="translate(18 28) rotate(-28)"><rect x="0" y="0" width="74" height="20" rx="10"/><path d="M18 4l-6 12M34 4l-6 12M50 4l-6 12M64 5l-5 10"/></g>
+        <!-- banana -->
+        <path d="M150 30c4 26 26 44 52 42c-4 8-20 16-36 10c-20-8-28-30-22-52z"/><path d="M150 30l-4-6"/>
+        <!-- garrafa de leite -->
+        <g transform="translate(222 100)"><path d="M8 0h12v8l6 10v34a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V18l6-10z"/><path d="M2 30h24"/></g>
+        <!-- ovo -->
+        <path d="M60 150c-12 0-20 16-20 28s9 20 20 20s20-8 20-20s-8-28-20-28z"/>
+        <!-- maçã -->
+        <g transform="translate(130 130)"><path d="M22 10c-8-6-22-4-22 12c0 14 10 26 18 26c3 0 4-2 6-2s3 2 6 2c8 0 16-12 16-26c0-16-14-18-22-12"/><path d="M24 10c0-6 2-9 6-11"/><path d="M26 6c6-4 12-2 14 2c-6 3-11 2-14-2z"/></g>
+        <!-- nota fiscal -->
+        <g transform="translate(206 196)"><path d="M0 0h40v52l-5-4l-5 4l-5-4l-5 4l-5-4l-5 4l-5-4l-5 4z"/><path d="M8 12h24M8 22h24M8 32h14"/></g>
+        <!-- cenoura -->
+        <g transform="translate(40 232) rotate(-35)"><path d="M0 0l40 10l-40 10z"/><path d="M0 4l-12-8M0 10h-14M0 16l-12 8"/><path d="M14 4l3 6M24 7l3 6"/></g>
+        <!-- pão de forma -->
+        <g transform="translate(118 220)"><path d="M6 18c-8 0-8-16 4-16h26c12 0 12 16 4 16v26H6z"/><path d="M14 26h18"/></g>
+      </g></g>
+    </pattern>
+  </defs>
+</svg>
 
 <div class="hero-faixa faixa">
+  <svg class="padrao p-hero" aria-hidden="true" focusable="false"><rect width="100%" height="100%" fill="url(#mercearia-clara)"/></svg>
   <div class="miolo">
     <header class="barra">
       <a class="marca" href="#topo"><i aria-hidden="true"></i>Ciclo Zero</a>
@@ -185,7 +277,7 @@
 </div>
 
 <main>
-  <section class="faixa bloco">
+  <section class="faixa bloco dor-bloco">
     <div class="miolo dor">
       <div>
         <h2>Quem não mede, joga dinheiro fora sem perceber.</h2>
@@ -205,6 +297,7 @@
   </section>
 
   <section class="faixa bloco papel" id="como-funciona">
+    <svg class="padrao p-papel" aria-hidden="true" focusable="false"><rect width="100%" height="100%" fill="url(#mercearia-verde)"/></svg>
     <div class="miolo">
       <h2>Da nota fiscal ao pedido de compra.</h2>
       <p class="sub">O dono confere e aprova. O resto o agente faz.</p>
@@ -241,6 +334,7 @@
   </section>
 
   <section class="faixa bloco escuro" id="confianca">
+    <svg class="padrao p-escuro" aria-hidden="true" focusable="false"><rect width="100%" height="100%" fill="url(#mercearia-clara)"/></svg>
     <div class="miolo">
       <h2>Feito para não inventar nada.</h2>
       <div class="confianca">
@@ -276,6 +370,7 @@
 </main>
 
 <section class="faixa bloco fecho">
+  <svg class="padrao p-fecho" aria-hidden="true" focusable="false"><rect width="100%" height="100%" fill="url(#mercearia-escura)"/></svg>
   <div class="miolo">
     <div>
       <h2>Pare de pagar pelo que vai para o lixo.</h2>
