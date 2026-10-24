@@ -53,6 +53,8 @@ Regras:
 1. Todo número que você citar (quantidade, data, R$, %) deve vir de uma ferramenta. Nunca estime nem invente.
 2. Antes de responder sobre estoque, validade, compras ou perdas, chame a ferramenta adequada.
 3. Se uma ferramenta devolver "erro", leia a mensagem: corrija (ex.: use o nome sugerido) ou pergunte ao usuário.
+   "Chegou", "recebi", "entregaram" = ENTRADA. Só registre saída (venda, perda, doação) quando o usuário disser que o produto saiu.
+   Mercadoria que chega já vencida não entra no estoque e NÃO é perda da loja: recuse e oriente devolver ao fornecedor.
    Nunca use outra operação para contornar uma recusa (ex.: entrada vencida recusada NÃO vira perda nem doação).
    Produto que não existe: ofereça cadastrar e peça os dados que faltam (categoria, unidade, custo, venda, estoque mínimo, fornecedor, prazo). Nunca invente preço ou fornecedor.
 4. Pedidos de compra: para repor o que o cálculo sugere, use criar_pedidos_sugeridos (todos os fornecedores de uma vez). Use criar_pedido_compra só quando o usuário pedir algo específico, depois de calcular_reposicao. Pedidos ficam como rascunho até o dono aprovar; deixe isso claro.
@@ -91,6 +93,15 @@ def _datas_br(obj):
     if isinstance(obj, str) and _ISO.match(obj):
         return data_br(obj)
     return obj
+
+
+_RE_CHEGADA = re.compile(r"\b(cheg\w*|receb\w*|entreg\w*)\b", re.I)
+_RE_SAIDA = re.compile(r"\b(vend\w*|perd\w*|estrag\w*|venc(eu|eram)|doa\w*|descart\w*|jog\w*|baix\w*|sa(i|iu|íram|iram))\b", re.I)
+
+
+def _mensagem_so_de_chegada(texto: str) -> bool:
+    """True se o usuário só falou de mercadoria chegando (sem venda/perda/doação)."""
+    return bool(_RE_CHEGADA.search(texto or "")) and not _RE_SAIDA.search(texto or "")
 
 
 _CAMPOS_SO_TELA = {"lote", "media_vendas_dia", "abaixo_do_custo", "lotes_consumidos", "estoque_minimo", "categoria"}
@@ -358,7 +369,11 @@ class AgenteCicloZero:
             # guardrail: se uma alteração de estoque foi recusada, não deixa "contornar" com OUTRA alteração
             # (ex.: entrada vencida recusada -> registrar como perda tirando do estoque bom)
             outras = escritas_recusadas - {nome}
-            if nome == "registrar_entrada" and "validade" in escritas_recusadas:
+            if nome == "registrar_saida" and _mensagem_so_de_chegada(mensagem):
+                resultado = {"erro": "Bloqueado: o usuário informou CHEGADA de mercadoria, não saída. Não registre "
+                                     "venda/perda/doação. Se a mercadoria chegou vencida, ela não entra no estoque: "
+                                     "oriente devolver ao fornecedor."}
+            elif nome == "registrar_entrada" and "validade" in escritas_recusadas:
                 resultado = {"erro": "Bloqueado: a validade informada foi recusada. Não invente outra data; "
                                      "pergunte ao usuário a validade correta."}
             elif nome in FERRAMENTAS_QUE_ALTERAM and outras - {"validade"}:

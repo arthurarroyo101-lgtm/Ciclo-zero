@@ -238,6 +238,14 @@ def registrar_saida(produto: str, quantidade: float, tipo: str = "venda", motivo
         saldo = _saldo(conn, p["id"])
         if quantidade > saldo:
             return {"erro": f"Saldo insuficiente: há {saldo} {p['unidade']} de {p['nome']}."}
+        if tipo == "perda" and "venc" in (motivo or "").lower():
+            vencido = conn.execute(
+                "SELECT COALESCE(SUM(quantidade),0) q FROM lotes WHERE produto_id=? AND validade IS NOT NULL AND validade<?",
+                (p["id"], _hoje().isoformat())).fetchone()["q"]
+            if quantidade > vencido:
+                return {"erro": f"Só há {vencido} {p['unidade']} de {p['nome']} vencidos no estoque. Perda por "
+                                f"vencimento não pode tirar produto dentro da validade. Mercadoria que chegou vencida "
+                                f"não entra no estoque: devolva ao fornecedor."}
         lotes = _baixar_fefo(conn, p["id"], quantidade)
         preco = p["preco_venda"] if tipo == "venda" else p["preco_custo"]
         conn.execute("INSERT INTO movimentacoes (produto_id, tipo, quantidade, valor, data, motivo) VALUES (?,?,?,?,?,?)",

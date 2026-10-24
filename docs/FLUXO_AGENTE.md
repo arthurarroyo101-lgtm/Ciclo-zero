@@ -54,6 +54,7 @@
 | Entrada inválida (quantidade negativa, data no passado, saldo insuficiente) | Ferramenta recusa com mensagem clara; o agente explica ao usuário |
 | Comprar demais (gera desperdício) | Pedido acima de 2× o sugerido é bloqueado; o cálculo desconta o que já foi pedido (sem pedido duplicado) |
 | Agente "contornar" uma recusa (ex.: entrada vencida recusada → lançar como perda; inventar outra validade) | Bloqueado no código: depois de uma alteração recusada, outra alteração diferente (ou nova validade inventada) na mesma pergunta é barrada até o usuário confirmar. *Bug real encontrado pela avaliação automática e corrigido.* |
+| Agente confundir chegada com saída ("chegou iogurte vencido" → lançar perda) | Regra no prompt + trava de intenção (mensagem só de chegada bloqueia registrar saída) + perda "por vencimento" só sai de lotes realmente vencidos. *Também achado pela avaliação.* |
 | Ação cara sem supervisão | Pedido de compra é só rascunho; aprovação é humana |
 | Desconto exagerado | Limite de 50%; o agente sinaliza quando o preço promocional fica abaixo do custo |
 | Loop infinito / gasto de cota | Máximo de 8 passos por pergunta + novas tentativas automáticas se a API falhar |
