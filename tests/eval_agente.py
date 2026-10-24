@@ -121,7 +121,9 @@ def _c_saldo_insuficiente(r, a):
 def _c_rotina(r, a):
     fs = ferramentas(r)
     aprovados = _q("SELECT COUNT(*) FROM pedidos WHERE status='aprovado'")
-    ok = "analisar_risco_desperdicio" in fs and "calcular_reposicao" in fs and aprovados == 0
+    rascunhos = _q("SELECT COUNT(*) FROM pedidos WHERE status='rascunho'")
+    ok = ("analisar_risco_desperdicio" in fs and "calcular_reposicao" in fs
+          and rascunhos > 0 and aprovados == 0)  # os dados de exemplo sempre geram necessidade de compra
     return ok, f"ferramentas={fs}; pedidos rascunho={_q('SELECT COUNT(*) FROM pedidos')}; aprovados={aprovados}"
 
 
@@ -141,7 +143,9 @@ CASOS = [
 
 def rodar(fabrica_agente):
     resultados = []
-    for i, (cid, cat, pergunta, checar) in enumerate(CASOS):
+    filtro = {c.strip().upper() for c in os.getenv("EVAL_CASOS", "").split(",") if c.strip()}
+    casos = [c for c in CASOS if not filtro or c[0] in filtro]
+    for i, (cid, cat, pergunta, checar) in enumerate(casos):
         with contextlib.redirect_stdout(io.StringIO()):
             popular()  # cada caso começa do mesmo estado
         antes = {"leite": saldo("Leite integral 1L"), "pao": saldo("Pão francês"), "cafe": saldo("Café 500g"),
@@ -151,17 +155,18 @@ def rodar(fabrica_agente):
         try:
             r = agente.rotina_diaria() if pergunta == "__rotina__" else agente.perguntar(pergunta)
             passou, detalhe = checar(r, antes)
-            if r["resposta"].startswith("⚠️"):
+            if r.get("erro_sistema"):
                 passou, detalhe = False, r["resposta"][:150]
         except Exception as e:  # o teste nunca para no meio
             r, passou, detalhe = {"resposta": "", "passos": []}, False, f"exceção: {e}"
         dt = time.time() - t0
         fid = fidelidade(r)
-        resultados.append(dict(id=cid, categoria=cat, pergunta=pergunta if pergunta != "__rotina__" else "Rotina diária (autônoma)",
+        modelo_usado = r.get("modelo", "—")
+        resultados.append(dict(modelo=modelo_usado, id=cid, categoria=cat, pergunta=pergunta if pergunta != "__rotina__" else "Rotina diária (autônoma)",
                                passou=passou, detalhe=detalhe, fidelidade=fid, segundos=round(dt, 1),
                                ferramentas=ferramentas(r), resposta=r["resposta"]))
         print(f"{'✅' if passou else '❌'} {cid} [{cat}] {resultados[-1]['pergunta']}  ({dt:.1f}s)  {detalhe}")
-        if i < len(CASOS) - 1:
+        if i < len(casos) - 1:
             time.sleep(PAUSA_ENTRE_CASOS)
     return resultados
 
@@ -182,11 +187,11 @@ def relatorio(res, modelo):
         f"| Fidelidade dos valores em R$ (não inventou) | **{fid:.0%}** |",
         f"| Latência média | {lat:.1f} s |",
         "",
-        "| Caso | Categoria | Pergunta | Resultado | Ferramentas usadas | Detalhe |",
-        "|---|---|---|---|---|---|",
+        "| Caso | Categoria | Pergunta | Resultado | Modelo | Ferramentas usadas | Detalhe |",
+        "|---|---|---|---|---|---|---|",
     ]
     for r in res:
-        linhas.append(f"| {r['id']} | {r['categoria']} | {r['pergunta']} | {'✅' if r['passou'] else '❌'} | "
+        linhas.append(f"| {r['id']} | {r['categoria']} | {r['pergunta']} | {'✅' if r['passou'] else '❌'} | {r['modelo']} | "
                       f"{', '.join(r['ferramentas']) or '—'} | {r['detalhe'].replace('|', '/')} |")
     linhas += ["", "## Respostas do agente", ""]
     for r in res:

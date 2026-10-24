@@ -61,12 +61,14 @@ Regras:
 Hoje é {hoje} ({dia_semana})."""
 
 ROTINA_DIARIA = (
-    "Execute a rotina diária de abertura da loja: (1) analise o risco de desperdício dos próximos 5 dias, "
-    "(2) monte o plano de ação por lote (promoção com preço, doação ou descarte), "
-    "(3) calcule a reposição e crie rascunhos de pedido por fornecedor apenas para o que for realmente necessário, "
-    "(4) termine com um resumo usando EXATAMENTE os campos de 'resumo' da análise: perda total se nada for feito, "
-    "receita recuperada com as promoções, custo dos itens que vão para doação, e os pedidos aguardando aprovação. "
-    "Não some nem recalcule valores."
+    "Execute a rotina diária de abertura da loja, nesta ordem, sem pedir confirmação:\n"
+    "1. Chame analisar_risco_desperdicio(dias=5) e monte o plano de ação por lote (promoção com preço, doação ou descarte).\n"
+    "2. Chame calcular_reposicao().\n"
+    "3. Para CADA fornecedor em 'sugestoes_por_fornecedor', chame criar_pedido_compra com os produtos e as "
+    "quantidades sugeridas (são rascunhos; o dono aprova depois). Se não houver sugestões, diga que não há compras.\n"
+    "4. Termine com um resumo usando EXATAMENTE os campos de 'resumo' da análise: perda total se nada for feito, "
+    "receita recuperada com as promoções, custo dos itens que vão para doação, e a lista de pedidos criados "
+    "(número, fornecedor, valor). Não some nem recalcule valores."
 )
 
 _FERR_POR_NOME = {f.__name__: f for f in FERRAMENTAS}
@@ -328,17 +330,18 @@ class AgenteCicloZero:
                 _log(self.sessao, len(passos), "erro", erro)
                 if any(p["ferramenta"] in FERRAMENTAS_QUE_ALTERAM for p in passos):
                     return {"resposta": "⚠️ O modelo caiu no meio da tarefa, depois de já ter alterado o estoque. "
-                                        "Confira a aba Estoque antes de repetir o pedido.", "passos": passos}
+                                        "Confira a aba Estoque antes de repetir o pedido.", "passos": passos,
+                            "erro_sistema": True}
                 continue
             if texto is None:
                 _log(self.sessao, MAX_PASSOS, "erro", "limite de passos atingido")
                 return {"resposta": "⚠️ Atingi o limite de passos para esta pergunta. Pode reformular de forma mais específica?",
-                        "passos": passos}
+                        "passos": passos, "erro_sistema": True}
             _log(self.sessao, len(passos) + 1, "resposta", f"[{prov.nome}:{prov.modelo}] {texto}")
             self.conversa += [("user", mensagem), ("assistant", texto)]
             return {"resposta": texto, "passos": passos, "modelo": f"{prov.nome}:{prov.modelo}"}
         return {"resposta": f"⚠️ Nenhum modelo de IA respondeu agora ({erro}). Tente de novo em instantes.",
-                "passos": passos}
+                "passos": passos, "erro_sistema": True}
 
     def rotina_diaria(self) -> dict:
         """Modo autônomo: o agente faz a checagem completa sem o usuário perguntar nada."""
