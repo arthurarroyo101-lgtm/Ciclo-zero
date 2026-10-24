@@ -71,12 +71,13 @@ ciclozero/agent.py      → loop multi-provedor (Groq → Gemini) + function cal
 ciclozero/metricas.py   → observabilidade: latência média/p95, erros, uso de reserva
 ciclozero/graficos.py   → gráficos do dashboard (João)
 ciclozero/seed.py       → padaria fictícia com 30 dias de histórico
-tests/eval_agente.py    → avaliação automática (11 casos) → docs/AVALIACAO.md
+tests/eval_agente.py    → avaliação automática (12 casos) → docs/AVALIACAO.md
 docs/                   → DECISOES, TAREFAS, FLUXO_AGENTE, DEMO, AVALIACAO
 ```
 Decisões de projeto: cálculos em Python (não no LLM) para evitar número inventado; FEFO na baixa de estoque; pedido de compra sempre como rascunho com aprovação humana; pedido > 2× o sugerido é bloqueado e reposição desconta pedidos em aberto; desconto máximo 50%; travas contra "contornar" recusas e contra confundir chegada com saída; máximo 8 passos por pergunta; troca automática de modelo/provedor.
 
 ## Log
+- **2026-10-24 00:55** — **PR #1 do João aceito** (reposição explicável): no teste manual ele viu o agente explicar a compra de leite com média/prazo inventados (a ferramenta não devolvia esses dados ao modelo). Agora `calcular_reposicao` devolve `prazo_entrega_dias` e um campo `conta` com o cálculo completo em pt-BR; quantidade arredondada para cima; regra no prompt para copiar a conta; novo caso **C12** (fidelidade da explicação). Ajuste na revisão: f-string com aspas aninhadas só roda em Python ≥ 3.12 → reescrita para funcionar em 3.10+. Fluxo de PR para arquivos de outro dono funcionou bem — manter.
 - **2026-10-24 00:35** — Roteiro da demo em `docs/DEMO.md` (≈75 s: Dashboard → entrada por linguagem natural → rotina autônoma → aprovação humana → Rastreio), checklist, plano B, como gravar o vídeo de backup e respostas para perguntas técnicas da banca.
 - **2026-10-24 00:27** — ✅ **Avaliação final v5: 11/11 casos, fidelidade 100%, latência média 14 s** (rotina 47 s nesta rodada por limite por minuto do Groq; sozinha ~25–28 s). **Agente congelado** — a partir daqui só correções críticas.
 - **2026-10-24 00:25** — Avaliação v4: 10/11, fidelidade 100%. C08 ainda falhava: o agente nem tentou a entrada, foi direto em `registrar_saida(perda)` (interpretou "chegou vencido" como perda). Correções em 3 camadas: regra no prompt (chegou = entrada; mercadoria vencida na chegada é devolvida ao fornecedor), trava de intenção no código (mensagem só de chegada bloqueia saída) e regra de negócio (perda por vencimento só consome lotes vencidos).

@@ -379,8 +379,9 @@ def calcular_reposicao() -> dict:
             precisa = float(math.ceil(bruto - 1e-9)) if p["unidade"] != "kg" else math.ceil(bruto * 10 - 1e-9) / 10
             if precisa > 0 and (saldo + pedido < p["estoque_minimo"] or saldo + pedido < media * prazo * 1.5):
                 u = p["unidade"]
+                dias_txt = "dia" if prazo == 1 else "dias"
                 if pela_venda >= p["estoque_minimo"]:
-                    base = (f"média de vendas {_num(media)} {u}/dia × ({prazo} {"dia" if prazo == 1 else "dias"} de entrega + {COBERTURA_DIAS} dias "
+                    base = (f"média de vendas {_num(media)} {u}/dia × ({prazo} {dias_txt} de entrega + {COBERTURA_DIAS} dias "
                             f"de cobertura) = {_num(pela_venda)} {u}")
                 else:
                     base = f"estoque mínimo de {_num(alvo)} {u} (maior que a venda prevista de {_num(pela_venda)} {u})"
