@@ -280,10 +280,30 @@ button:active { transform: translateY(1px); }
 [data-testid="stBaseButton-secondary"]:hover { border-color: var(--folha) !important; color: var(--folha) !important; }
 [data-testid="stBaseButton-primary"]:hover { background: #255830 !important; border-color: #255830 !important; }
 button [data-testid="stIconMaterial"] { font-size: 1.15em; }
-.stTabs [role="tab"] [data-testid="stIconMaterial"] { color: var(--tinta-2); transition: color .15s ease; }
-.stTabs [aria-selected="true"] [data-testid="stIconMaterial"] { color: var(--folha); }
-.stTabs [role="tab"]:hover p, .stTabs [role="tab"]:hover [data-testid="stIconMaterial"] { color: var(--folha) !important; }
-[data-baseweb="tab-highlight"] { background: var(--folha) !important; transition: left .25s ease, width .25s ease !important; }
+/* Navegação principal como botões grandes (não abas): borda, ícone e texto legíveis; o ativo fica cheio de verde */
+.stTabs [role="tablist"], .stTabs [data-baseweb="tab-list"] {
+    gap: 10px; flex-wrap: wrap; padding: 4px 2px 8px; height: auto !important; overflow: visible !important;
+}
+.stTabs [role="tablist"]::before, .stTabs [role="tablist"]::after { display: none !important; }
+.stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] { display: none !important; }
+.stTabs [role="tab"] {
+    min-height: 52px; padding: 0 22px !important; border: 1.5px solid var(--linha) !important; border-radius: 10px !important;
+    background: var(--branco) !important; transition: background-color .15s ease, border-color .15s ease, transform .08s ease;
+}
+.stTabs [role="tab"] p { font-size: 17px !important; font-weight: 700 !important; color: var(--tinta) !important; }
+.stTabs [role="tab"] [data-testid="stIconMaterial"], .stTabs [role="tab"] span[role="img"] {
+    font-size: 22px !important; color: var(--folha); margin-right: 6px; vertical-align: -5px !important; }
+.stTabs [role="tab"], .stTabs [role="tab"]:focus { box-shadow: none !important; outline: none; }
+.stTabs [role="tab"]::after, .stTabs [role="tab"]::before,
+.stTabs [role="tab"] > div:not([data-testid="stMarkdownContainer"]) { display: none !important; }  /* barrinha de aba */
+.stTabs [role="tab"]:focus-visible { outline: 3px solid var(--etiqueta) !important; outline-offset: 2px; }
+.stTabs [role="tab"]:hover { border-color: var(--folha) !important; background: #F3F7F3 !important; }
+.stTabs [role="tab"]:active { transform: translateY(1px); }
+.stTabs [aria-selected="true"] { background: var(--folha) !important; border-color: var(--folha) !important; }
+.stTabs [aria-selected="true"] p, .stTabs [aria-selected="true"] [data-testid="stIconMaterial"],
+.stTabs [aria-selected="true"] span[role="img"] { color: var(--branco) !important; }
+.stTabs [aria-selected="true"]:hover { background: #255830 !important; }
+.stTabs [data-baseweb="tab-panel"] { padding-top: 18px; }
 .cz-aovivo { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--folha); }
 .cz-aovivo small { font-weight: 400; color: var(--tinta-2); }
 .cz-pulso { width: 9px; height: 9px; border-radius: 50%; background: var(--folha); position: relative; }
