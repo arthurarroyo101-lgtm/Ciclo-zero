@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 
-from ciclozero import tools
+from ciclozero import tools, ui_agente
 from ciclozero.db import DB_PATH, conectar, criar_tabelas
 
 load_dotenv()
@@ -79,26 +79,37 @@ with aba_chat:
         st.session_state.setdefault("chat", [])
         if st.button("▶️ Rodar rotina diária (modo autônomo)", type="primary"):
             with st.status("O agente está trabalhando...", expanded=True) as status:
-                agente.ao_passo = status.write
+                agente.ao_passo = lambda t: status.write(ui_agente.passo_amigavel(t))
                 r = agente.rotina_diaria()
                 status.update(label="Rotina concluída", state="complete", expanded=False)
+            r["rotina"] = True
             st.session_state.chat.append(("user", "▶️ Rotina diária"))
             st.session_state.chat.append(("assistant", r))
         for papel, conteudo in st.session_state.chat:
-            with st.chat_message(papel):
+            with st.chat_message(papel, avatar="♻️" if papel == "assistant" else None):
                 if papel == "user":
                     st.markdown(conteudo)
+                    continue
+                passos = conteudo.get("passos") or []
+                if conteudo.get("rotina") and ui_agente.tem_plano(passos) and not conteudo.get("erro_sistema"):
+                    # rotina: cartões primeiro (números das ferramentas), texto do agente logo abaixo
+                    ui_agente.render_plano(passos)
+                    with st.expander("💬 Resumo escrito pelo agente", expanded=False):
+                        st.markdown(conteudo["resposta"])
                 else:
                     st.markdown(conteudo["resposta"])
-                    if conteudo["passos"]:
-                        with st.expander(f"🔧 {len(conteudo['passos'])} ferramenta(s) usada(s)"):
-                            for p in conteudo["passos"]:
-                                st.markdown(f"**{p['ferramenta']}** `{p['argumentos']}`")
-                                st.json(p["resultado"], expanded=False)
+                    if ui_agente.tem_plano(passos) and not conteudo.get("erro_sistema"):
+                        ui_agente.render_plano(passos)
+                if passos:
+                    with st.expander(f"🔧 Como o agente chegou nisso ({len(passos)} ferramenta(s))"):
+                        for i, p in enumerate(passos, 1):
+                            st.markdown(f"**{i}. {ui_agente.nome_amigavel(p['ferramenta'])}** · "
+                                        f"`{p['ferramenta']}({p['argumentos']})`")
+                            st.json(p["resultado"], expanded=False)
         if msg := st.chat_input("Ex.: chegaram 30 litros de leite com validade 30/10/2026"):
             st.session_state.chat.append(("user", msg))
             with st.status("O agente está trabalhando...", expanded=True) as status:
-                agente.ao_passo = status.write
+                agente.ao_passo = lambda t: status.write(ui_agente.passo_amigavel(t))
                 st.session_state.chat.append(("assistant", agente.perguntar(msg)))
                 status.update(label="Pronto", state="complete", expanded=False)
             st.rerun()
