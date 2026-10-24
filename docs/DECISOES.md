@@ -20,7 +20,8 @@
 - **Interface:** Streamlit
 - **Banco:** SQLite (arquivo local, zero custo)
 - **LLM:** Google Gemini (plano gratuito) com function calling — a equipe não tem créditos AWS
-- **LLM reserva:** Groq (gratuito, API compatível com OpenAI) — troca automática se o Gemini cair
+- **LLM principal:** Groq `openai/gpt-oss-120b` (gratuito, rápido, 10/10 na avaliação)
+- **LLM reserva:** Gemini — troca automática se o Groq cair
 - **Repositório:** público, licença MIT (o edital valoriza código aberto)
 
 ## Prazos do dia (24/10)
@@ -72,6 +73,7 @@ docs/FLUXO_AGENTE.md    → entregável: inputs, lógica, outputs (Arthur revisa
 Decisões de projeto: cálculos em Python (não no LLM) para evitar número inventado; FEFO na baixa de estoque; pedido de compra sempre como rascunho com aprovação humana; pedido > 2× o sugerido é bloqueado; desconto máximo 50%; máximo 8 passos por pergunta; modelo configurável por `GEMINI_MODEL` (padrão `gemini-3.8-flash`).
 
 ## Log
+- **2026-10-23 22:15** — C08 e C10 passando (rotina com Groq agora cria 3 rascunhos de pedido). **Decisão: Groq como provedor principal, Gemini como reserva** (`PROVEDORES=groq,gemini`) — Groq mais rápido e sem estourar cota; Gemini estourou a cota gratuita em poucas rodadas.
 - **2026-10-23 22:12** — 1ª avaliação automática (Groq `gpt-oss-120b`): **9/10, fidelidade 100%, 15,3 s/resposta**. C08 falhou por bug do teste (agente recusou corretamente o lote vencido). C10 passou mas o Groq não criou pedidos na rotina → instrução da rotina reescrita em passos explícitos e teste endurecido (exige rascunhos). Teste agora aceita `EVAL_CASOS=C08,C10` para rodar só alguns casos e registra o modelo usado em cada caso.
 - **2026-10-23 22:05** — ✅ Primeira rotina diária completa com IA real (analisou risco → reposição → 3 pedidos rascunho → plano por lote → resumo); o fallback de modelo funcionou ao vivo (3.8-flash com cota estourada → flash-lite). Corrigido: resumo mostrava 'em risco' = 'evitado' (mesmo número); agora a análise devolve campos separados (perda sem ação, receita recuperada com promoções, custo doado, descarte). Sobra de produto vendido por unidade arredondada para cima.
 - **2026-10-23 22:00** — Gemini instável à noite (429 cota, 503 sobrecarga, 504 timeout em todos os modelos). Decidido adicionar **Groq como provedor reserva automático** (ordem em `PROVEDORES`). O agente agora mantém a conversa em texto comum aos provedores; se um cair depois de já ter alterado o estoque, não repete a operação no outro (evita lançamento duplicado). Interface mostra os passos do agente ao vivo (`st.status`).

@@ -35,7 +35,7 @@ from .tools import FERRAMENTAS, data_br
 
 load_dotenv()
 
-PROVEDORES = [p.strip().lower() for p in os.getenv("PROVEDORES", "gemini,groq").split(",") if p.strip()]
+PROVEDORES = [p.strip().lower() for p in os.getenv("PROVEDORES", "groq,gemini").split(",") if p.strip()]
 MODELO = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 MODELOS_RESERVA = [m.strip() for m in os.getenv(
     "GEMINI_MODELOS_RESERVA", "gemini-flash-latest,gemini-flash-lite-latest").split(",") if m.strip()]
