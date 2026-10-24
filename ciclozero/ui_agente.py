@@ -323,6 +323,10 @@ button [data-testid="stIconMaterial"] { font-size: 1.15em; }
 /* ---- Sistema da landing aplicado ao painel (docs/DESIGN.md, "Sistema visual da landing page") ---- */
 .stApp { font-weight: 400; }
 h1, h2, h3, h4, h5, [data-testid="stHeading"] * { font-family: "Archivo", "Manrope", sans-serif !important; font-weight: 400 !important; letter-spacing: -.01em; }
+/* caixa do chat: a borda verde já marca o foco; sem o quadrado escuro do contorno interno */
+[data-testid="stChatInput"] textarea:focus, [data-testid="stChatInput"] textarea:focus-visible {
+    outline: none !important; box-shadow: none !important; border: 0 !important; }
+[data-testid="stChatInput"]:focus-within { border-color: #24552E !important; box-shadow: 0 0 0 3px rgba(47,107,59,.15) !important; }
 .cz-pergunta { font-family: "Archivo", sans-serif; font-weight: 400; }
 .cz-produto, .cz-pedido li b, .cz-selo { font-weight: 600 !important; }
 .cz-marca .cz-nome { font-family: "Archivo", sans-serif; font-weight: 500; }
@@ -367,6 +371,11 @@ TEXTO_DOR = (
     "ocupando espaço e dinheiro. Acompanhe o que entra e sai, confira as quantidades e fique atento às "
     "datas de validade para reduzir perdas e manter seu estoque sempre organizado."
 )
+
+
+def md_seguro(texto: str) -> str:
+    """Texto do agente para st.markdown: "R$ ... R$" não pode virar fórmula matemática (deixava a tela quebrada)."""
+    return (texto or "").replace("\\$", "$").replace("$", "\\$")
 
 
 def aplicar_estilo() -> None:

@@ -230,6 +230,12 @@ class Simulador:
         itens = [i for i in itens if i["produto"] in proprios]
         if not itens:
             return None
+        # só assa o que está acabando (há pouco pão na prateleira); de vez em quando assa sem precisar (o problema)
+        precisa = [i for i in itens if i["saldo"] < i["media_vendas_dia"] * 0.6]
+        if precisa:
+            itens = precisa
+        elif random.random() > 0.15:
+            return None
         item = random.choice(itens)
         # às vezes o padeiro exagera na fornada (produção acima da venda = sobra no fim do dia)
         fator = random.uniform(0.4, 0.8) if random.random() < 0.7 else random.uniform(1.0, 1.6)

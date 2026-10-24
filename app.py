@@ -116,9 +116,9 @@ with aba_chat:
                     # rotina: cartões primeiro (números das ferramentas), texto do agente logo abaixo
                     ui_agente.render_plano(passos)
                     with st.expander("Resumo escrito pelo agente", expanded=False):
-                        st.markdown(conteudo["resposta"])
+                        st.markdown(ui_agente.md_seguro(conteudo["resposta"]))
                 else:
-                    st.markdown(conteudo["resposta"])
+                    st.markdown(ui_agente.md_seguro(conteudo["resposta"]))
                     if ui_agente.tem_plano(passos) and not conteudo.get("erro_sistema"):
                         ui_agente.render_plano(passos)
                 if passos and tecnico:

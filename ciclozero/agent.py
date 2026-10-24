@@ -138,7 +138,11 @@ def _padronizar_reais(texto: str) -> str:
 
 def _limpar_resposta(texto: str) -> str:
     """Remove marcas de citação internas (ex.: 【calcular_reposicao】) e padroniza valores em R$."""
-    return _padronizar_reais(_CITACAO.sub("", texto or "").strip())
+    texto = _CITACAO.sub("", texto or "").strip()
+    # espaços e hífens "especiais" que alguns modelos usam (quebram a formatação na tela): viram os comuns
+    texto = texto.replace("\u202f", " ").replace("\u00a0", " ").replace("\u2011", "-")
+    texto = re.sub(r"R\$ +-", "-R$ ", texto)  # "R$ -276,31" -> "-R$ 276,31"
+    return _padronizar_reais(texto)
 
 
 def _enxuto(obj):

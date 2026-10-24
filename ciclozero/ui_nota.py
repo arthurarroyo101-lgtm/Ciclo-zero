@@ -149,4 +149,5 @@ def render(obter_agente) -> None:
         analise = st.session_state.get("nota_analise")
         if analise:
             with st.chat_message("assistant"):
-                st.markdown(analise["resposta"])
+                from .ui_agente import md_seguro
+                st.markdown(md_seguro(analise["resposta"]))
