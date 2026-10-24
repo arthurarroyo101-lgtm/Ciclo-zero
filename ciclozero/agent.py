@@ -53,6 +53,7 @@ Regras:
 1. Todo número que você citar (quantidade, data, R$, %) deve vir de uma ferramenta. Nunca estime nem invente.
 2. Antes de responder sobre estoque, validade, compras ou perdas, chame a ferramenta adequada.
 3. Se uma ferramenta devolver "erro", leia a mensagem: corrija (ex.: use o nome sugerido) ou pergunte ao usuário.
+   Nunca use outra operação para contornar uma recusa (ex.: entrada vencida recusada NÃO vira perda nem doação).
    Produto que não existe: ofereça cadastrar e peça os dados que faltam (categoria, unidade, custo, venda, estoque mínimo, fornecedor, prazo). Nunca invente preço ou fornecedor.
 4. Pedidos de compra: para repor o que o cálculo sugere, use criar_pedidos_sugeridos (todos os fornecedores de uma vez). Use criar_pedido_compra só quando o usuário pedir algo específico, depois de calcular_reposicao. Pedidos ficam como rascunho até o dono aprovar; deixe isso claro.
 5. Para lotes em risco, priorize: promoção (vender) > doação (banco de alimentos/ONG) > descarte.
@@ -350,9 +351,26 @@ class AgenteCicloZero:
                 "erro": bool(resultado.get("erro_sistema"))})
             return resultado
 
+        escritas_recusadas: set[str] = set()
+
         def chamar(nome, args, passo):
             self._avisar(f"🔧 {nome}({args})")
-            resultado = _datas_br(_executar(nome, args))
+            # guardrail: se uma alteração de estoque foi recusada, não deixa "contornar" com OUTRA alteração
+            # (ex.: entrada vencida recusada -> registrar como perda tirando do estoque bom)
+            outras = escritas_recusadas - {nome}
+            if nome == "registrar_entrada" and "validade" in escritas_recusadas:
+                resultado = {"erro": "Bloqueado: a validade informada foi recusada. Não invente outra data; "
+                                     "pergunte ao usuário a validade correta."}
+            elif nome in FERRAMENTAS_QUE_ALTERAM and outras - {"validade"}:
+                resultado = {"erro": f"Bloqueado: a operação '{sorted(outras - {'validade'})[0]}' foi recusada nesta conversa. "
+                                     "Não faça outra alteração no estoque para contornar; explique ao usuário e "
+                                     "pergunte como ele quer seguir."}
+            else:
+                resultado = _datas_br(_executar(nome, args))
+                if nome in FERRAMENTAS_QUE_ALTERAM and isinstance(resultado, dict) and "erro" in resultado:
+                    escritas_recusadas.add(nome)
+                    if nome == "registrar_entrada" and "alidade" in resultado["erro"]:
+                        escritas_recusadas.add("validade")
             passos.append({"ferramenta": nome, "argumentos": args, "resultado": resultado})
             _log(self.sessao, passo, "ferramenta", {"nome": nome, "args": args, "resultado": resultado})
             return _enxuto(resultado)

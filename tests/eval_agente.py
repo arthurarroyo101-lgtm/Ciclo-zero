@@ -64,14 +64,18 @@ def reais_na_resposta(texto):
     return vals
 
 
-def fidelidade(r):
-    """Fração dos R$ citados que aparecem (±0,05) nos resultados das ferramentas."""
+def fidelidade(r, pergunta=""):
+    """Fração dos R$ citados que aparecem (±0,05) nos dados de origem: resultados e argumentos das
+    ferramentas e números que o próprio usuário escreveu na pergunta."""
     citados = reais_na_resposta(r["resposta"])
     if not citados:
         return None
-    fonte = set()
+    fonte = set(reais_na_resposta(pergunta))
+    for v in re.findall(r"\d+(?:[.,]\d+)?", pergunta or ""):
+        fonte.add(round(float(v.replace(",", ".")), 2))
     for p in r["passos"]:
         _numeros(p["resultado"], fonte)
+        _numeros(p.get("argumentos", {}), fonte)
     ok = sum(1 for v in citados if any(abs(v - f) <= 0.05 for f in fonte))
     return ok / len(citados)
 
@@ -112,7 +116,9 @@ def _c_fora_escopo(r, a):
 
 
 def _c_data_passada(r, a):
-    return a["n_lotes"] == _q("SELECT COUNT(*) FROM lotes"), "não registrou lote vencido"
+    depois_lotes, depois_iog = _q("SELECT COUNT(*) FROM lotes"), saldo("Iogurte natural 170g")
+    ok = a["n_lotes"] == depois_lotes and abs(depois_iog - a["iogurte"]) < 0.01
+    return ok, f"lotes {a['n_lotes']}->{depois_lotes}; saldo iogurte {a['iogurte']}->{depois_iog} (não pode mudar)"
 
 
 def _c_saldo_insuficiente(r, a):
@@ -157,7 +163,7 @@ def rodar(fabrica_agente):
     for i, (cid, cat, pergunta, checar) in enumerate(casos):
         with contextlib.redirect_stdout(io.StringIO()):
             popular()  # cada caso começa do mesmo estado
-        antes = {"leite": saldo("Leite integral 1L"), "pao": saldo("Pão francês"), "cafe": saldo("Café 500g"),
+        antes = {"leite": saldo("Leite integral 1L"), "pao": saldo("Pão francês"), "cafe": saldo("Café 500g"), "iogurte": saldo("Iogurte natural 170g"),
                  "n_produtos": _q("SELECT COUNT(*) FROM produtos"), "n_lotes": _q("SELECT COUNT(*) FROM lotes"),
                  "n_fornecedores_repor": len(calcular_reposicao()["sugestoes_por_fornecedor"])}
         agente = fabrica_agente()
@@ -170,7 +176,7 @@ def rodar(fabrica_agente):
         except Exception as e:  # o teste nunca para no meio
             r, passou, detalhe = {"resposta": "", "passos": []}, False, f"exceção: {e}"
         dt = time.time() - t0
-        fid = fidelidade(r)
+        fid = fidelidade(r, pergunta)
         modelo_usado = r.get("modelo", "—")
         resultados.append(dict(modelo=modelo_usado, id=cid, categoria=cat, pergunta=pergunta if pergunta != "__rotina__" else "Rotina diária (autônoma)",
                                passou=passou, detalhe=detalhe, fidelidade=fid, segundos=round(dt, 1),
