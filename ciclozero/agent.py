@@ -32,6 +32,8 @@ load_dotenv()
 
 MODELO = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 MAX_PASSOS = 8
+# nível de raciocínio do modelo: "minimal", "low", "medium" ou "high" (menos = mais rápido)
+NIVEL_RACIOCINIO = os.getenv("GEMINI_THINKING", "low")
 
 INSTRUCOES = """Você é o Ciclo Zero, agente de estoque de um pequeno comércio de alimentos (padaria/mercadinho).
 Missão: reduzir o desperdício de alimentos sem deixar faltar produto.
@@ -108,17 +110,23 @@ class AgenteCicloZero:
             tools=FERRAMENTAS,
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
             temperature=0.2,
+            thinking_config=types.ThinkingConfig(thinking_level=NIVEL_RACIOCINIO) if NIVEL_RACIOCINIO else None,
         )
 
     def _gerar(self, contents):
         # tenta de novo em caso de limite de cota/instabilidade do plano gratuito
-        for tentativa in range(3):
+        for tentativa in range(4):
             try:
                 return self.client.models.generate_content(model=self.modelo, contents=contents, config=self.config)
             except Exception as e:
                 msg = str(e)
+                # modelo que não aceita nível de raciocínio: tira a opção e tenta de novo
+                if "thinking" in msg.lower() and self.config.thinking_config is not None:
+                    self.config.thinking_config = None
+                    self._avisar("ℹ️ modelo não aceita nível de raciocínio; seguindo sem ele")
+                    continue
                 # erro de configuração (modelo inexistente, chave inválida): não adianta tentar de novo
-                if tentativa == 2 or any(c in msg for c in ("404", "401", "403", "API key", "INVALID_ARGUMENT")):
+                if tentativa == 3 or any(c in msg for c in ("404", "401", "403", "API key", "INVALID_ARGUMENT")):
                     raise
                 self._avisar(f"⏳ API instável ({msg[:80]}...), tentando de novo")
                 time.sleep(4 * (tentativa + 1))
