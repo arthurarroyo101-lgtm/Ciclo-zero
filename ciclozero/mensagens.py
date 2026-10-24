@@ -88,7 +88,7 @@ def _html_plaquinha(p: dict) -> str:
 CSS_PLAQ = """
 .cz-plaqs { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin: .4rem 0 .8rem; }
 .cz-plaq { background: #F6D23C; color: #1D2B22; border-radius: 0 0 8px 8px; border-top: 8px solid #1D2B22;
-           padding: 12px 14px 10px; font-family: "Atkinson Hyperlegible", Arial, sans-serif; break-inside: avoid; }
+           padding: 12px 14px 10px; font-family: "Manrope", Arial, sans-serif; break-inside: avoid; }
 .cz-plaq-oferta { display: inline-block; background: #C8402B; color: #fff; font-weight: 700; font-size: 13px;
                   padding: 1px 8px; border-radius: 4px; }
 .cz-plaq-produto { font-weight: 700; font-size: 18px; margin-top: 6px; line-height: 1.2; }
@@ -107,7 +107,7 @@ def pagina_impressao(lista: list[dict]) -> str:
     """HTML com todas as plaquinhas, pronto para abrir e imprimir (Ctrl+P)."""
     return ("<!doctype html><html lang='pt-BR'><head><meta charset='utf-8'><title>Plaquinhas de oferta</title>"
             "<link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Archivo:wght@900&"
-            "family=Atkinson+Hyperlegible:wght@400;700&display=swap'>"
+            "family=Manrope:wght@400;600&display=swap'>"
             f"<style>body{{margin:16px;background:#fff}}{CSS_PLAQ}"
             ".cz-plaqs{grid-template-columns:repeat(3,1fr)}@media print{body{margin:0}}</style></head><body>"
             f"<div class='cz-plaqs'>{''.join(_html_plaquinha(p) for p in lista)}</div></body></html>")

@@ -168,7 +168,7 @@ def render_plano(passos: list[dict]) -> None:
 CSS = """
 <style>
 /* Sistema visual: docs/DESIGN.md (cores, fontes, escala 14/16/20/26/36, cantos 6/8px) */
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,700..900&family=Atkinson+Hyperlegible:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,200..800&family=Manrope:wght@300;400;500;600;700&display=swap');
 
 :root {
     --tinta: #1D2B22;
@@ -181,11 +181,11 @@ CSS = """
     --branco: #FFFFFF;
 }
 
-/* Texto: Atkinson Hyperlegible no app todo (não aplicar em span: ícones do Streamlit têm fonte própria) */
+/* Texto: Manrope no app todo (mesmo sistema da landing) (não aplicar em span: ícones do Streamlit têm fonte própria) */
 html, body, .stApp, .stMarkdown, .stMarkdown p, .stMarkdown li, h1, h2, h3, h4, h5,
 label, button, input, textarea, [data-testid="stMetricLabel"], [data-testid="stCaptionContainer"],
 .stTabs button p {
-    font-family: "Atkinson Hyperlegible", system-ui, sans-serif !important;
+    font-family: "Manrope", system-ui, sans-serif !important;
 }
 .stApp { color: var(--tinta); background: var(--branco); font-size: 16px; }
 .stMarkdown p, .stMarkdown li { max-width: 75ch; }
@@ -193,10 +193,10 @@ h3 { font-size: 26px !important; } h4 { font-size: 20px !important; } h5 { font-
 h1, h2, h3, h4, h5 { color: var(--tinta) !important; }
 [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p { color: var(--tinta-2) !important; font-size: 14px; }
 
-/* Valores em R$ e números grandes: Archivo 800 levemente condensada, algarismos tabulares */
+/* Valores em R$ e números grandes: Archivo leve (sistema da landing), algarismos tabulares */
 [data-testid="stMetricValue"], [data-testid="stMetricValue"] div, .cz-valor, .cz-pedido-total b, .cz-pedido li b {
     font-family: "Archivo", "Arial Narrow", sans-serif !important;
-    font-weight: 800 !important; font-stretch: 85%; font-variant-numeric: tabular-nums;
+    font-weight: 500 !important; font-stretch: 100%; font-variant-numeric: tabular-nums;
 }
 [data-testid="stMetricValue"] { font-size: 36px !important; color: var(--tinta); }
 
@@ -290,7 +290,7 @@ button [data-testid="stIconMaterial"] { font-size: 1.15em; }
     min-height: 52px; padding: 0 22px !important; border: 1.5px solid var(--linha) !important; border-radius: 10px !important;
     background: var(--branco) !important; transition: background-color .15s ease, border-color .15s ease, transform .08s ease;
 }
-.stTabs [role="tab"] p { font-size: 17px !important; font-weight: 700 !important; color: var(--tinta) !important; }
+.stTabs [role="tab"] p { font-size: 17px !important; font-weight: 600 !important; color: var(--tinta) !important; }
 .stTabs [role="tab"] [data-testid="stIconMaterial"], .stTabs [role="tab"] span[role="img"] {
     font-size: 22px !important; color: var(--folha); margin-right: 6px; vertical-align: -5px !important; }
 .stTabs [role="tab"], .stTabs [role="tab"]:focus { box-shadow: none !important; outline: none; }
@@ -314,6 +314,44 @@ button [data-testid="stIconMaterial"] { font-size: 1.15em; }
                    animation: cz-pulso 1.6s ease-out infinite; }
 @keyframes cz-pulso { from { transform: scale(1); opacity: .6; } to { transform: scale(2.6); opacity: 0; } }
 [data-testid="stChatMessageAvatarCustom"], [data-testid="stChatMessage"] [data-testid="stIconMaterial"] { color: var(--folha); }
+
+/* ---- Sistema da landing aplicado ao painel (docs/DESIGN.md, "Sistema visual da landing page") ---- */
+.stApp { font-weight: 400; }
+h1, h2, h3, h4, h5, [data-testid="stHeading"] * { font-family: "Archivo", "Manrope", sans-serif !important; font-weight: 400 !important; letter-spacing: -.01em; }
+.cz-pergunta { font-family: "Archivo", sans-serif; font-weight: 400; }
+.cz-produto, .cz-pedido li b, .cz-selo { font-weight: 600 !important; }
+.cz-marca .cz-nome { font-family: "Archivo", sans-serif; font-weight: 500; }
+/* verde em degradê (escuro -> claro), como a hero: item ativo e botões principais */
+.stTabs [aria-selected="true"], [data-testid="stBaseButton-primary"], button[kind="primary"] {
+    background: linear-gradient(115deg, #1A4424 0%, #2F6B3B 55%, #4C8E58 100%) !important; border-color: #24552E !important;
+}
+.stTabs [aria-selected="true"]:hover, [data-testid="stBaseButton-primary"]:hover {
+    background: linear-gradient(115deg, #143A1E 0%, #24552E 55%, #3F7B4A 100%) !important; }
+/* faixa do relógio: uma "mini hero" verde em degradê */
+.cz-relogio { background: linear-gradient(115deg, #0F2E17 0%, #1A4424 30%, #2F6B3B 65%, #79B583 100%);
+              color: #DCEADF; padding: 10px 16px; border-radius: 10px; margin-bottom: 10px; }
+.cz-relogio .cz-hora { color: #FFFFFF; font-weight: 600; }
+.cz-relogio small, .cz-relogio .cz-ontem { color: #DCEADF; }
+.cz-relogio .cz-aovivo { color: #FFFFFF; }
+.cz-relogio .cz-pulso, .cz-relogio .cz-pulso::after { background: #F6D23C; }
+/* alertas: amarelo de etiqueta em degradê */
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentWarning"]) {
+    background: linear-gradient(180deg, #FFE066 0%, #F6D23C 60%) !important; }
+/* notificação (toast) animada: etiqueta amarela que entra, fica ~12 s e sai; tem X para fechar */
+[data-testid="stToast"] { background: linear-gradient(180deg, #FFE066 0%, #F6D23C 60%) !important; color: #1D2B22 !important;
+    border: 1px solid #C9A616 !important; border-radius: 10px !important; box-shadow: 0 14px 34px rgba(29,43,34,.28) !important;
+    min-width: 320px; }
+[data-testid="stToast"] p, [data-testid="stToast"] * { color: #1D2B22 !important; }
+@media (prefers-reduced-motion: no-preference) {
+    [data-testid="stToast"] { animation: cz-entra .45s cubic-bezier(.2,.8,.2,1) both; }
+    @keyframes cz-entra { from { transform: translateY(18px) scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
+}
+/* aba Alertas: resumo por produto */
+.cz-alertas-resumo { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin: .5rem 0 1rem; }
+.cz-alerta-grupo { background: #FFF8D6; border-left: 5px solid #F6D23C; border-radius: 6px; padding: 10px 12px;
+                   display: grid; gap: 2px; font-size: 14px; color: #4F5E54; }
+.cz-alerta-grupo b { color: #1D2B22; font-size: 16px; font-weight: 600; }
+.cz-alerta-grupo em { font-style: normal; font-family: "Archivo", sans-serif; font-size: 22px; color: #C8402B; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>

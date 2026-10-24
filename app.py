@@ -82,10 +82,10 @@ perdas = tools.relatorio_desperdicio(30)
 
 # ícones Material (monocromáticos, mesmo traço): a palavra explica, o ícone só ajuda a achar
 _nomes_abas = [":material/forum: Agente", ":material/receipt_long: Nota fiscal", ":material/monitoring: Dashboard",
-               ":material/inventory_2: Estoque", ":material/local_shipping: Pedidos"]
+               ":material/inventory_2: Estoque", ":material/local_shipping: Pedidos", ":material/notifications: Alertas"]
 _abas = st.tabs(_nomes_abas + ([":material/manage_search: Rastreio"] if tecnico else []))
-aba_chat, aba_nota, aba_dash, aba_painel, aba_pedidos = _abas[:5]
-aba_log = _abas[5] if tecnico else st.empty()  # Rastreio só no modo técnico
+aba_chat, aba_nota, aba_dash, aba_painel, aba_pedidos, aba_alertas = _abas[:6]
+aba_log = _abas[6] if tecnico else st.empty()  # Rastreio só no modo técnico
 
 with aba_nota:  # módulo separado (Matheus) para não conflitar com o resto da interface
     from ciclozero import ui_nota
@@ -168,7 +168,7 @@ with aba_dash:
                       help="Pedidos aprovados que ainda não chegaram. Quando chegam, entram no estoque e saem do caixa.")
             f6.metric("Pedidos para aprovar", fin["pedidos_pendentes"],
                       esc(fin["pedidos_pendentes_rs"]) if fin["pedidos_pendentes"] else None, delta_color="off")
-            ao_vivo.render_alertas_excesso(maximo=2)
+            ao_vivo.render_aviso_alertas()
             if tecnico:
                 st.caption("Caixa: vendas menos compras, produção e despesas. Lucro: vendas menos o custo do que foi "
                            "vendido, as perdas e as despesas. Comprado a mais: custo do que entrou além do que a loja "
@@ -276,6 +276,12 @@ with aba_pedidos:
                         st.rerun()
                     mensagens.render_mensagem_pedido(p)  # texto pronto para o WhatsApp do fornecedor
     _aba_pedidos()
+
+with aba_alertas:
+    @st.fragment(run_every=ao_vivo.intervalo())  # ao vivo: atualiza sozinho
+    def _aba_alertas():
+        ao_vivo.render_aba_alertas()
+    _aba_alertas()
 
 with aba_log:
     @st.fragment(run_every=ao_vivo.intervalo())  # ao vivo: atualiza sozinho

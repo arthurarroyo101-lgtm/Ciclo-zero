@@ -99,7 +99,8 @@ class Simulador:
         dias_ideal = 1 if origem == "producao" else min(validade_dias, tools.COBERTURA_DIAS + 2)
         ideal = max(0.0, media * dias_ideal - saldo_antes)
         arred = (lambda v: round(v, 1)) if item["unidade"] == "kg" else (lambda v: float(round(v)))
-        alerta = {"hora": relogio.hora().strftime("%H:%M"), "origem": origem, "produto": item["produto"],
+        alerta = {"id": f"{relogio.agora().isoformat()}-{item['produto']}", "hora": relogio.hora().strftime("%H:%M"),
+                  "origem": origem, "produto": item["produto"],
                   "unidade": item["unidade"], "quantidade": qtd, "media_dia": round(media, 1),
                   "validade_dias": validade_dias, "sobra": arred(sobra), "ideal": arred(ideal),
                   "excesso_rs": round(sobra * custo, 2)}
@@ -293,28 +294,28 @@ def _reais(v: float) -> str:
 
 _CARTOES_HTML = """
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,700..900&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,200..800&family=Manrope:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   /* Etiquetas de gôndola (docs/DESIGN.md): valor grande, "R$" pequeno, cantos de etiqueta */
   :root { --tinta:#1D2B22; --tinta2:#4F5E54; --folha:#2F6B3B; --etiqueta:#F6D23C; --tomate:#C8402B;
           --linha:#D9DED6; --fundo:#FFFFFF; }
   html, body { margin:0; padding:0; background:transparent; color:var(--tinta);
-               font-family:"Atkinson Hyperlegible", system-ui, sans-serif; }
+               font-family:"Manrope", system-ui, sans-serif; }
   .grade { display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:10px; padding:2px; }
   .tag { position:relative; background:var(--fundo); border:1.5px solid var(--linha); border-radius:6px;
          padding:9px 12px 8px; min-width:0; }
-  .tag.destaque { background:var(--etiqueta); border-color:#D9B51F; }
+  .tag.destaque { background:linear-gradient(180deg, #FFE066 0%, #F6D23C 55%); border-color:#D9B51F; box-shadow:0 6px 16px rgba(201,166,22,.25); }
   .tag.destaque::before { content:""; position:absolute; right:10px; top:9px; width:9px; height:9px;
                           border-radius:50%; background:#fff; border:1.5px solid #C9A616; }  /* furo da etiqueta */
   .rotulo { font-size:13px; color:var(--tinta2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .tag.destaque .rotulo { color:var(--tinta); font-weight:700; }
-  .valor { font-family:"Archivo", "Atkinson Hyperlegible", sans-serif; font-weight:800; font-stretch:85%;
+  .tag.destaque .rotulo { color:var(--tinta); font-weight:600; }
+  .valor { font-family:"Archivo", "Manrope", sans-serif; font-weight:500; font-stretch:100%;
            font-size:clamp(20px, 2.7vw, 34px); line-height:1.15; white-space:nowrap;
            font-variant-numeric:tabular-nums; letter-spacing:-.01em; }
-  .valor .rs { font-size:.5em; font-weight:700; vertical-align:.55em; margin-right:2px; }
+  .valor .rs { font-size:.5em; font-weight:400; vertical-align:.55em; margin-right:2px; }
   .valor.negativo { color:var(--tomate); }
   .nota { font-size:12px; color:var(--tinta2); margin-top:1px; min-height:16px; }
-  .delta { font-size:12px; font-weight:700; margin-top:1px; min-height:16px; opacity:0; transition:opacity .3s; }
+  .delta { font-size:12px; font-weight:600; margin-top:1px; min-height:16px; opacity:0; transition:opacity .3s; }
   .delta.mostra { opacity:1; }
   .bom { color:var(--folha); } .ruim { color:var(--tomate); }
   .pisca-bom { color:var(--folha) !important; } .pisca-ruim { color:var(--tomate) !important; }
@@ -397,20 +398,90 @@ def tabela_movimento():
     return pd.DataFrame(linhas)
 
 
-def render_alertas_excesso(maximo: int = 3) -> None:
-    """O problema, mostrado na hora em que acontece: compra/produção acima do que a loja vende antes de vencer."""
+def _num(v: float) -> str:
+    return f"{v:g}".replace(".", ",")
+
+
+def texto_alerta(a: dict, curto: bool = False) -> str:
+    """O problema, no momento em que acontece: compra/produção acima do que a loja vende antes de vencer."""
+    u = a["unidade"]
+    verbo = "saíram do forno" if a.get("origem") == "producao" else "chegaram"
+    rs = _reais(a["excesso_rs"]).replace("$", chr(92) + "$")
+    if curto:
+        return (f"**{a['hora']}: {verbo} {_num(a['quantidade'])} {u} de {a['produto']}.** "
+                f"Cerca de {_num(a['sobra'])} {u} vão para o lixo ({rs}).")
+    sugestao = (f"Com o Ciclo Zero, o {'plano de produção' if a.get('origem') == 'producao' else 'pedido'} sugerido seria "
+                f"**{_num(a['ideal'])} {u}**." if a["ideal"] > 0 else
+                f"Com o Ciclo Zero, **não {'precisava produzir' if a.get('origem') == 'producao' else 'precisava comprar'} "
+                f"agora**: já havia estoque suficiente.")
+    return (f"**{a['hora']}: {verbo} {_num(a['quantidade'])} {u} de {a['produto']}.** A loja vende cerca de "
+            f"{_num(a['media_dia'])} {u}/dia e vence em {a['validade_dias']} dia(s): **~{_num(a['sobra'])} {u} vão para o "
+            f"lixo ({rs})**. {sugestao}")
+
+
+def alertas_do_dia() -> list[dict]:
+    """Todos os alertas de compra/produção em excesso do dia da loja (mais recentes primeiro)."""
+    hoje = relogio.hoje().isoformat()
+    with conectar() as conn:
+        linhas = conn.execute("SELECT conteudo FROM log_agente WHERE tipo='alerta_excesso' ORDER BY id DESC").fetchall()
+    saida = []
+    for r in linhas:
+        try:
+            a = json.loads(r["conteudo"])
+        except ValueError:
+            continue
+        if a.get("data") == hoje:
+            saida.append(a)
+    return saida
+
+
+def notificar_novos_alertas() -> None:
+    """Mostra cada alerta novo como notificação animada (some sozinha em ~12 s ou no X). Cada um aparece uma vez."""
     import streamlit as st
-    for a in list(simulador().alertas)[:maximo]:
-        u = a["unidade"]
-        verbo = "Saíram do forno" if a["origem"] == "producao" else "Chegaram"
-        st.warning(
-            f"**{a['hora']}: {verbo.lower()} {a['quantidade']:g} {u} de {a['produto']}** — a loja vende ~{a['media_dia']:g} {u}/dia "
-            f"e vence em {a['validade_dias']} dia(s): **~{a['sobra']:g} {u} vão para o lixo "
-            f"({_reais(a['excesso_rs']).replace('$', chr(92) + '$')})**. "
-            + (f"Com o Ciclo Zero, o {'plano de produção' if a['origem'] == 'producao' else 'pedido'} sugerido seria "
-               f"**{a['ideal']:g} {u}**." if a["ideal"] > 0 else
-               f"Com o Ciclo Zero, **não {'precisava produzir' if a['origem'] == 'producao' else 'precisava comprar'} "
-               f"agora**: já havia estoque suficiente."), icon=":material/warning:")
+    vistos = st.session_state.setdefault("_alertas_vistos", None)
+    atuais = list(simulador().alertas)
+    if vistos is None:  # ao abrir a página, não despeja os antigos de uma vez: eles ficam na aba Alertas
+        st.session_state["_alertas_vistos"] = {a.get("id") for a in atuais}
+        return
+    for a in reversed(atuais):
+        if a.get("id") not in vistos:
+            vistos.add(a.get("id"))
+            st.toast(texto_alerta(a, curto=True) + " Veja na aba Alertas.", icon=":material/warning:", duration=12)
+
+
+def render_aviso_alertas() -> None:
+    """No Dashboard: uma linha discreta apontando para a aba Alertas (em vez de despejar os avisos na tela)."""
+    import streamlit as st
+    n = len(alertas_do_dia())
+    if n:
+        st.caption(f"{n} alerta(s) de compra ou produção acima do que a loja vende hoje. Veja todos na aba Alertas.")
+
+
+def render_aba_alertas() -> None:
+    """Aba Alertas: tudo o que foi comprado/produzido a mais hoje, agrupado por produto, para quem não viu na hora."""
+    import streamlit as st
+    lista = alertas_do_dia()
+    st.subheader("Alertas de hoje")
+    if not lista:
+        st.info("Nenhum alerta hoje. Quando entrar mais mercadoria do que a loja vende antes de vencer, aparece aqui.",
+                icon=":material/notifications:")
+        return
+    total = sum(a["excesso_rs"] for a in lista)
+    st.caption(f"{len(lista)} alerta(s) em {relogio.hoje().strftime('%d/%m')}. Se nada for feito, cerca de "
+               f"{_reais(total).replace('$', chr(92) + '$')} em mercadoria vão para o lixo.")
+    por_produto: dict[str, dict] = {}
+    for a in lista:
+        g = por_produto.setdefault(a["produto"], {"n": 0, "rs": 0.0, "sobra": 0.0, "unidade": a["unidade"]})
+        g["n"] += 1
+        g["rs"] += a["excesso_rs"]
+        g["sobra"] += a["sobra"]
+    st.markdown("<div class='cz-alertas-resumo'>" + "".join(
+        f"<div class='cz-alerta-grupo'><b>{nome}</b><span>{g['n']} vez(es)</span>"
+        f"<span>~{_num(round(g['sobra'], 1))} {g['unidade']} a mais</span><em>{_reais(g['rs'])}</em></div>"
+        for nome, g in sorted(por_produto.items(), key=lambda x: -x[1]["rs"])) + "</div>", unsafe_allow_html=True)
+    st.markdown("##### Linha do tempo")
+    for a in lista:
+        st.warning(texto_alerta(a), icon=":material/warning:")
 
 
 def controles() -> None:
@@ -456,6 +527,7 @@ def painel() -> None:
         else:
             st.markdown(f"<div class='cz-relogio'><span class='cz-hora'>{relogio.rotulo()}</span>{ontem}</div>",
                         unsafe_allow_html=True)
+        notificar_novos_alertas()
         if fech and st.session_state.get("_fech_visto") != fech["data"]:
             if "_fech_visto" in st.session_state:
                 st.toast(f"Loja fechada. Dia {fech['data']}: vendeu {_reais(fech['vendas_rs'])}, "

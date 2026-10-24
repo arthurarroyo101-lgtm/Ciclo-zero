@@ -117,7 +117,7 @@ def dados_top_desperdicio(relatorio: dict, n: int = 5) -> pd.DataFrame:
 
 # ------------------------------------------------------------------ gráficos
 
-FONTE = "Atkinson Hyperlegible, Arial, sans-serif"  # reserva sem serifa se a fonte não carregar no gráfico
+FONTE = "Manrope, Arial, sans-serif"  # reserva sem serifa se a fonte não carregar no gráfico
 
 
 def _alt():
