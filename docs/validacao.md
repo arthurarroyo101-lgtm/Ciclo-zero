@@ -24,6 +24,13 @@ Investigar como pequenos comércios controlam estoque e compras, quais dificulda
 
 A entrevista aponta uma oportunidade relacionada a **controle de estoque, redução de trabalho manual e planejamento de compras**, e não uma dor comprovada de desperdício de alimentos. O relato sugere interesse potencial em uma ferramenta simples, mas ainda não comprova preço aceitável nem intenção de compra efetiva.
 
+### Materiais associados à entrevista
+
+- **Fotografia:** imagem da entrevista enviada na conversa em 24/10/2026.
+- **Gravações enviadas:** quatro arquivos com o nome-base `Canto caseiro.m4a`, recebidos como anexos MP4.
+- **Nota de integridade:** os quatro arquivos de vídeo enviados têm conteúdo binário idêntico (mesmo tamanho e hash), portanto parecem ser cópias duplicadas, não quatro gravações distintas.
+- **Situação no repositório:** os anexos permanecem na conversa e **não foram carregados como arquivos binários no GitHub**. Este registro documenta sua associação ao Canto Caseiro, mas não substitui a inclusão dos próprios arquivos no repositório. Antes de compartilhar publicamente, confirme a autorização das pessoas filmadas/gravadas e evite expor dados pessoais sem necessidade.
+
 ## Entrevista 2 — Subway
 
 - **Data:** 23/10/2026
@@ -76,11 +83,12 @@ Nas próximas entrevistas, buscar respostas concretas para:
 ## Evidências
 
 - Entrevistas relatadas pelo responsável pela validação em 23/10/2026.
-- Há uma foto associada à atividade de entrevista na conversa de trabalho. **A imagem ainda não está armazenada neste repositório**; deve ser adicionada pelo fluxo combinado da equipe, caso seja permitido, e sem expor dados pessoais desnecessários.
+- Materiais associados ao Canto Caseiro listados na seção da entrevista 1. Os arquivos de mídia ainda não estão armazenados neste repositório.
 - Nenhuma estatística externa foi adicionada neste registro. Dados oficiais sobre desperdício no Brasil ainda precisam ser pesquisados e citados antes de serem usados no pitch.
 
 ## Próximas ações
 
+- [ ] Carregar a fotografia e a gravação original autorizadas no repositório, após confirmar consentimento e remover duplicatas.
 - [ ] Realizar mais entrevistas com estabelecimentos que tenham estoque perecível e dificuldades concretas.
 - [ ] Quantificar tempo gasto, perdas, faltas e custos atuais.
 - [ ] Testar disposição a pagar com faixas de preço, sem induzir a resposta.
