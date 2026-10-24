@@ -246,7 +246,7 @@ if __name__ == "__main__":
 
     def fabrica():
         a = AgenteCicloZero()
-        a.ao_passo = lambda t: print("      " + t, flush=True) if t.startswith(("🔁", "⏭️")) else None
+        a.ao_passo = lambda t: print("      " + t, flush=True) if t.startswith(("🔁", "⏭️", "⏳")) else None
         usados.append(a)
         return a
 

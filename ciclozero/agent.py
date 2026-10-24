@@ -41,7 +41,7 @@ MODELOS_RESERVA = [m.strip() for m in os.getenv(
     "GEMINI_MODELOS_RESERVA", "gemini-flash-latest,gemini-flash-lite-latest").split(",") if m.strip()]
 NIVEL_RACIOCINIO = os.getenv("GEMINI_THINKING", "low")  # minimal | low | medium | high
 GROQ_MODELS = [m.strip() for m in os.getenv(
-    "GROQ_MODELS", "openai/gpt-oss-120b,llama-3.3-70b-versatile").split(",") if m.strip()]
+    "GROQ_MODELS", "openai/gpt-oss-120b,openai/gpt-oss-20b,qwen/qwen3.8-27b").split(",") if m.strip()]
 GROQ_RACIOCINIO = os.getenv("GROQ_REASONING", "low")  # low | medium | high (só modelos gpt-oss)
 MAX_PASSOS = 8
 FERRAMENTAS_QUE_ALTERAM = {"cadastrar_produto", "registrar_entrada", "registrar_saida", "criar_pedido_compra", "criar_pedidos_sugeridos"}

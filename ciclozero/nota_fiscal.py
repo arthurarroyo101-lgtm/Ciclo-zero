@@ -31,7 +31,7 @@ MODELOS_VISAO_GEMINI = [m.strip() for m in os.getenv(
     "GEMINI_VISION_MODELS", "gemini-flash-latest,gemini-3.8-flash,gemini-flash-lite-latest").split(",") if m.strip()]
 MODELOS_VISAO_GROQ = [m.strip() for m in os.getenv(
     "GROQ_VISION_MODELS",
-    "meta-llama/llama-4-scout-17b-16e-instruct,meta-llama/llama-4-maverick-17b-128e-instruct").split(",") if m.strip()]
+    "qwen/qwen3.8-27b,meta-llama/llama-4-scout-17b-16e-instruct").split(",") if m.strip()]
 
 PROMPT_LEITURA = """Você recebe a foto de uma nota fiscal ou cupom de COMPRA de mercadorias de um pequeno comércio de alimentos.
 Extraia os dados EXATAMENTE como aparecem na imagem. Não invente nada: se um campo não estiver legível, use null.
