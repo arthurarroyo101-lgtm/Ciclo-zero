@@ -68,9 +68,11 @@ ciclozero/agent.py      → loop Gemini + function calling, guardrails, rastreio
 ciclozero/seed.py       → padaria/mercadinho fictício com 30 dias de histórico
 docs/FLUXO_AGENTE.md    → entregável: inputs, lógica, outputs (Arthur revisa)
 ```
-Decisões de projeto: cálculos em Python (não no LLM) para evitar número inventado; FEFO na baixa de estoque; pedido de compra sempre como rascunho com aprovação humana; pedido > 2× o sugerido é bloqueado; desconto máximo 50%; máximo 8 passos por pergunta; modelo configurável por `GEMINI_MODEL` (padrão `gemini-2.5-flash`).
+Decisões de projeto: cálculos em Python (não no LLM) para evitar número inventado; FEFO na baixa de estoque; pedido de compra sempre como rascunho com aprovação humana; pedido > 2× o sugerido é bloqueado; desconto máximo 50%; máximo 8 passos por pergunta; modelo configurável por `GEMINI_MODEL` (padrão `gemini-3.8-flash`).
 
 ## Log
+- **2026-10-23 21:30** — Datas e valores em padrão brasileiro (DD/MM/AAAA; R$ 1.234,56) na interface e nas respostas do agente; o agente aceita validade em DD/MM/AAAA. Decidido incluir **dashboards com gráficos** (João Paulo). Divisão de tarefas por dono de arquivo, todos na `main` com Sync antes/depois → ver `docs/TAREFAS.md`. Criado `tools.historico_diario()` como base dos gráficos.
+- **2026-10-23 21:22** — Primeiro teste real: interface ok; Gemini respondeu 404 porque `gemini-2.5-flash` não está mais disponível para contas novas. Modelo padrão trocado para `gemini-3.8-flash` (configurável via `GEMINI_MODEL` no `.env`).
 - **2026-10-23 21:15** — Base do agente criada (v0.1): banco, 8 ferramentas, loop do agente com Gemini, modo autônomo "rotina diária", interface Streamlit com abas Agente/Estoque/Pedidos/Rastreio, dados de exemplo e documentação do fluxo. Ferramentas testadas localmente; falta testar com chave real do Gemini.
 - **2026-10-23 21:10** — Primeiro push feito. Commits usam o e-mail noreply do GitHub (o GitHub bloqueia push que expõe e-mail privado).
 - **2026-10-23 21:00** — Confirmado: hackathon presencial Centro-Oeste (24/10). Tema da inscrição: Ciclo Zero (desperdício de alimentos em pequenos comércios). Repositório criado pelo Arthur (`arthurarroyo101-lgtm/Ciclo-zero`). Sem créditos AWS → Gemini gratuito. Divisão de tarefas aceita. A equipe conhece comerciantes para validação.

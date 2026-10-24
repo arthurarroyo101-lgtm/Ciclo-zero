@@ -20,6 +20,22 @@ if not DB_PATH.exists():
 criar_tabelas()
 
 
+COLUNAS_DATA = ("validade", "validade_mais_proxima", "data", "data_entrada", "criado_em")
+
+
+def tabela(linhas):
+    """DataFrame com datas no padrão brasileiro."""
+    df = pd.DataFrame(linhas)
+    for c in COLUNAS_DATA:
+        if c in df.columns:
+            df[c] = df[c].map(tools.data_br)
+    return df
+
+
+def reais(v: float) -> str:
+    return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
 @st.cache_resource
 def get_agente(chave: str):
     from ciclozero.agent import AgenteCicloZero
@@ -42,9 +58,9 @@ vencendo = tools.listar_produtos_vencendo(3)
 perdas = tools.relatorio_desperdicio(30)
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Lotes em risco (5 dias)", len(risco["lotes_em_risco"]))
-c2.metric("R$ em risco (3 dias)", f"R$ {vencendo['valor_total_em_risco']:.2f}")
-c3.metric("Perda evitável pelo plano", f"R$ {risco['perda_evitavel_rs']:.2f}")
-c4.metric("Perdas últimos 30 dias", f"R$ {perdas['total_perdas_rs']:.2f}", perdas["perdas_sobre_faturamento"] + " do faturamento",
+c2.metric("R$ em risco (3 dias)", reais(vencendo["valor_total_em_risco"]))
+c3.metric("Perda evitável pelo plano", reais(risco["perda_evitavel_rs"]))
+c4.metric("Perdas últimos 30 dias", reais(perdas["total_perdas_rs"]), perdas["perdas_sobre_faturamento"] + " do faturamento",
           delta_color="off")
 
 aba_chat, aba_painel, aba_pedidos, aba_log = st.tabs(["💬 Agente", "📦 Estoque", "🧾 Pedidos", "🔍 Rastreio"])
@@ -71,7 +87,7 @@ with aba_chat:
                             for p in conteudo["passos"]:
                                 st.markdown(f"**{p['ferramenta']}** `{p['argumentos']}`")
                                 st.json(p["resultado"], expanded=False)
-        if msg := st.chat_input("Ex.: chegaram 30 litros de leite com validade 2026-10-30"):
+        if msg := st.chat_input("Ex.: chegaram 30 litros de leite com validade 30/10/2026"):
             st.session_state.chat.append(("user", msg))
             with st.spinner("Pensando..."):
                 st.session_state.chat.append(("assistant", agente.perguntar(msg)))
@@ -80,9 +96,9 @@ with aba_chat:
 with aba_painel:
     st.subheader("Lotes em risco de desperdício")
     if risco["lotes_em_risco"]:
-        st.dataframe(pd.DataFrame(risco["lotes_em_risco"]), width="stretch", hide_index=True)
+        st.dataframe(tabela(risco["lotes_em_risco"]), width="stretch", hide_index=True)
     st.subheader("Estoque atual")
-    st.dataframe(pd.DataFrame(tools.consultar_estoque()["itens"]), width="stretch", hide_index=True)
+    st.dataframe(tabela(tools.consultar_estoque()["itens"]), width="stretch", hide_index=True)
 
 with aba_pedidos:
     pedidos = tools.listar_pedidos()
@@ -90,7 +106,7 @@ with aba_pedidos:
         st.info("Nenhum pedido ainda. Rode a rotina diária ou peça ao agente para calcular a reposição.")
     for p in pedidos:
         with st.container(border=True):
-            st.markdown(f"**Pedido #{p['id']} — {p['fornecedor']}** · R$ {p['valor_estimado']:.2f} · `{p['status']}`")
+            st.markdown(f"**Pedido #{p['id']} — {p['fornecedor']}** · {reais(p['valor_estimado'])} · `{p['status']}`")
             st.caption(p["justificativa"] or "")
             st.dataframe(pd.DataFrame(p["itens"]), hide_index=True)
             if p["status"] == "rascunho":

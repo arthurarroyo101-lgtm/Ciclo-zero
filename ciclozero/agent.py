@@ -24,11 +24,13 @@ from google import genai
 from google.genai import types
 
 from .db import conectar, criar_tabelas
-from .tools import FERRAMENTAS
+import re
+
+from .tools import FERRAMENTAS, data_br
 
 load_dotenv()
 
-MODELO = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+MODELO = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 MAX_PASSOS = 8
 
 INSTRUCOES = """Você é o Ciclo Zero, agente de estoque de um pequeno comércio de alimentos (padaria/mercadinho).
@@ -41,8 +43,10 @@ Regras:
 4. Pedidos de compra: chame calcular_reposicao antes de criar_pedido_compra. Pedidos ficam como rascunho até o dono aprovar; deixe isso claro.
 5. Para lotes em risco, priorize: promoção (vender) > doação (banco de alimentos/ONG) > descarte.
 6. Se o pedido estiver fora do seu escopo (não for sobre o estoque do comércio), diga educadamente que só ajuda com estoque e desperdício.
-7. Responda em português do Brasil, curto e prático, como quem fala com o dono do comércio. Use listas quando houver vários itens.
-Hoje é {hoje}."""
+7. Datas: sempre escreva no formato brasileiro DD/MM/AAAA. Ao passar validade para ferramentas, use DD/MM/AAAA.
+8. Valores em reais no formato R$ 1.234,56.
+9. Responda em português do Brasil, curto e prático, como quem fala com o dono do comércio. Use listas quando houver vários itens.
+Hoje é {hoje} ({dia_semana})."""
 
 ROTINA_DIARIA = (
     "Execute a rotina diária de abertura da loja: (1) analise o risco de desperdício dos próximos 5 dias, "
@@ -52,6 +56,19 @@ ROTINA_DIARIA = (
 )
 
 _FERR_POR_NOME = {f.__name__: f for f in FERRAMENTAS}
+_DIAS = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"]
+_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _datas_br(obj):
+    """Converte toda data ISO do resultado para DD/MM/AAAA antes de mostrar ao modelo."""
+    if isinstance(obj, dict):
+        return {k: _datas_br(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_datas_br(v) for v in obj]
+    if isinstance(obj, str) and _ISO.match(obj):
+        return data_br(obj)
+    return obj
 
 
 def _log(sessao: str, passo: int, tipo: str, conteudo) -> None:
@@ -85,7 +102,8 @@ class AgenteCicloZero:
         self.historico: list[types.Content] = []
         self.sessao = uuid.uuid4().hex[:8]
         self.config = types.GenerateContentConfig(
-            system_instruction=INSTRUCOES.format(hoje=date.today().isoformat()),
+            system_instruction=INSTRUCOES.format(hoje=date.today().strftime("%d/%m/%Y"),
+                                                  dia_semana=_DIAS[date.today().weekday()]),
             tools=FERRAMENTAS,
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
             temperature=0.2,
@@ -125,7 +143,7 @@ class AgenteCicloZero:
             partes = []
             for fc in chamadas:
                 args = dict(fc.args or {})
-                resultado = _executar(fc.name, args)
+                resultado = _datas_br(_executar(fc.name, args))
                 passos.append({"ferramenta": fc.name, "argumentos": args, "resultado": resultado})
                 _log(self.sessao, passo, "ferramenta", {"nome": fc.name, "args": args, "resultado": resultado})
                 partes.append(types.Part.from_function_response(name=fc.name, response={"result": resultado}))

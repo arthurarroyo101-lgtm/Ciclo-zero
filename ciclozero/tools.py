@@ -25,6 +25,27 @@ def _hoje() -> date:
     return date.today()
 
 
+def ler_data(txt: str) -> date:
+    """Aceita DD/MM/AAAA (padrão brasileiro), DD/MM/AA ou AAAA-MM-DD."""
+    txt = (txt or "").strip()
+    for fmt in ("%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(txt, fmt).date()
+        except ValueError:
+            pass
+    raise ValueError(txt)
+
+
+def data_br(iso: str | None) -> str | None:
+    """'2026-10-30' -> '30/10/2026' (para exibir)."""
+    if not iso:
+        return iso
+    try:
+        return date.fromisoformat(str(iso)[:10]).strftime("%d/%m/%Y")
+    except ValueError:
+        return iso
+
+
 def _norm(txt: str) -> str:
     txt = unicodedata.normalize("NFKD", txt or "").encode("ascii", "ignore").decode()
     return " ".join(txt.lower().split())
@@ -129,16 +150,17 @@ def registrar_entrada(produto: str, quantidade: float, validade: str) -> dict:
     Args:
         produto: nome do produto já cadastrado.
         quantidade: quantidade recebida (maior que zero), na unidade do produto.
-        validade: data de validade no formato AAAA-MM-DD.
+        validade: data de validade no formato DD/MM/AAAA (ex.: 30/10/2026).
     """
     if quantidade is None or quantidade <= 0:
         return {"erro": "A quantidade precisa ser maior que zero."}
     try:
-        val = date.fromisoformat(validade)
+        val = ler_data(validade)
     except (TypeError, ValueError):
-        return {"erro": "Validade inválida. Use o formato AAAA-MM-DD."}
+        return {"erro": "Validade inválida. Use o formato DD/MM/AAAA."}
     if val < _hoje():
-        return {"erro": f"A validade {validade} já passou; confirme a data com o usuário."}
+        return {"erro": f"A validade {val.strftime('%d/%m/%Y')} já passou; confirme a data com o usuário."}
+    validade = val.isoformat()
     with conectar() as conn:
         p, erro = _resolver_produto(conn, produto)
         if erro:
@@ -356,6 +378,20 @@ FERRAMENTAS = [
 
 
 # --------------------------------------------- funções só da interface (humano)
+def historico_diario(dias: int = 30) -> list[dict]:
+    """Uma linha por dia x produto x tipo (venda/perda/doacao/entrada), com quantidade e R$.
+    Base para os gráficos do dashboard."""
+    inicio = (_hoje() - timedelta(days=int(dias))).isoformat()
+    with conectar() as conn:
+        rows = conn.execute(
+            """SELECT m.data, p.nome produto, p.categoria, m.tipo, SUM(m.quantidade) quantidade, SUM(m.valor) valor
+               FROM movimentacoes m JOIN produtos p ON p.id=m.produto_id
+               WHERE m.data>=? GROUP BY m.data, p.nome, p.categoria, m.tipo ORDER BY m.data""",
+            (inicio,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def listar_pedidos(status: str | None = None) -> list[dict]:
     with conectar() as conn:
         q = "SELECT * FROM pedidos" + (" WHERE status=?" if status else "") + " ORDER BY id DESC"

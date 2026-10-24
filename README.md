@@ -20,6 +20,7 @@ Na primeira execução o app cria um banco com dados de exemplo (padaria fictíc
 
 ## Documentação
 - [Diário de decisões](docs/DECISOES.md)
+- [Divisão de tarefas](docs/TAREFAS.md)
 - [Fluxo do agente (inputs, lógica, outputs)](docs/FLUXO_AGENTE.md)
 
 ## Licença
