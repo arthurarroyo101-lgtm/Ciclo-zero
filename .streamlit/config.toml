@@ -1,0 +1,6 @@
+[theme]
+# verde do Ciclo Zero; o resto acompanha o tema claro/escuro do navegador
+primaryColor = "#2E7D32"
+
+[browser]
+gatherUsageStats = false

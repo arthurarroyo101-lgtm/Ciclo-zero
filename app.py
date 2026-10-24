@@ -64,7 +64,8 @@ c3.metric("Perda projetada sem ação", reais(risco["resumo"]["perda_total_sem_a
 c4.metric("Perdas últimos 30 dias", reais(perdas["total_perdas_rs"]), perdas["perdas_sobre_faturamento"] + " do faturamento",
           delta_color="off")
 
-aba_chat, aba_painel, aba_pedidos, aba_log = st.tabs(["💬 Agente", "📦 Estoque", "🧾 Pedidos", "🔍 Rastreio"])
+aba_chat, aba_dash, aba_painel, aba_pedidos, aba_log = st.tabs(
+    ["💬 Agente", "📊 Dashboard", "📦 Estoque", "🧾 Pedidos", "🔍 Rastreio"])
 
 with aba_chat:
     if not (tem_env or chave):
@@ -97,6 +98,56 @@ with aba_chat:
                 st.session_state.chat.append(("assistant", agente.perguntar(msg)))
                 status.update(label="Pronto", state="complete", expanded=False)
             st.rerun()
+
+with aba_dash:
+    from ciclozero import graficos
+
+    hist = tools.historico_diario(30)
+    df_lotes = graficos.dados_lotes_em_risco(risco)
+    df_top = graficos.dados_top_desperdicio(perdas, 5)
+    df_cat = graficos.dados_perdas_por_categoria(hist)
+    df_dia = graficos.dados_vendas_x_perdas(hist)
+
+    st.caption("Todos os números saem do banco, pelas mesmas ferramentas que o agente usa. "
+               "Perdas e risco são medidos pelo custo do produto.")
+
+    col_a, col_b = st.columns(2)
+    with col_a, st.container(border=True):
+        st.markdown("#### ⏳ O que precisa de ação agora")
+        if df_lotes.empty:
+            st.success("Nenhum lote vence nos próximos 5 dias com sobra prevista.")
+        else:
+            st.caption(f"{len(df_lotes)} lote(s) vencem em até 5 dias e não devem ser vendidos a tempo. "
+                       f"Sem ação, a perda seria de **{graficos.reais(df_lotes['perda'].sum())}**.")
+            st.altair_chart(graficos.grafico_lotes_em_risco(df_lotes), width="stretch")
+    with col_b, st.container(border=True):
+        st.markdown("#### 🏆 Top 5 produtos que mais geram desperdício")
+        if df_top.empty:
+            st.info("Sem perdas registradas nos últimos 30 dias.")
+        else:
+            lider = df_top.iloc[0]
+            st.caption(f"**{lider['produto']}** sozinho responde por {lider['parcela']} "
+                       f"({lider['valor_fmt']} em 30 dias).")
+            st.altair_chart(graficos.grafico_top_desperdicio(df_top), width="stretch")
+
+    with st.container(border=True):
+        st.markdown("#### 📈 Vendas × perdas por dia (últimos 30 dias)")
+        if df_dia.empty:
+            st.info("Sem movimentações no período.")
+        else:
+            st.caption(f"Faturamento de {graficos.reais(perdas['faturamento_rs'])} e perdas de "
+                       f"{graficos.reais(perdas['total_perdas_rs'])} ({perdas['perdas_sobre_faturamento']} do "
+                       "faturamento). Cada eixo tem sua escala para as perdas não sumirem no gráfico.")
+            st.altair_chart(graficos.grafico_vendas_x_perdas(df_dia), width="stretch")
+
+    with st.container(border=True):
+        st.markdown("#### 🗂️ Perdas por categoria")
+        if df_cat.empty:
+            st.info("Sem perdas registradas nos últimos 30 dias.")
+        else:
+            st.caption(f"**{df_cat.iloc[0]['categoria']}** é a categoria que mais perde "
+                       f"({df_cat.iloc[0]['valor_fmt']} em 30 dias).")
+            st.altair_chart(graficos.grafico_perdas_por_categoria(df_cat), width="stretch")
 
 with aba_painel:
     st.subheader("Lotes em risco de desperdício")
