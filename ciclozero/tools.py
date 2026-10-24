@@ -366,7 +366,8 @@ def calcular_reposicao() -> dict:
         prods = conn.execute("SELECT * FROM produtos").fetchall()
         # o que já foi pedido (rascunho ou aprovado) conta como "a caminho": evita pedido duplicado
         a_caminho: dict[str, float] = {}
-        for ped in conn.execute("SELECT itens_json FROM pedidos WHERE status IN ('rascunho','aprovado')"):
+        for ped in conn.execute("SELECT itens_json FROM pedidos WHERE status IN ('rascunho','aprovado') "
+                                "AND recebido_em IS NULL"):
             for item in json.loads(ped["itens_json"]):
                 a_caminho[item["produto"]] = a_caminho.get(item["produto"], 0) + item["quantidade"]
         por_forn: dict[str, list] = {}
@@ -534,4 +535,87 @@ def listar_pedidos(status: str | None = None) -> list[dict]:
 
 def decidir_pedido(pedido_id: int, aprovar: bool) -> None:
     with conectar() as conn:
-        conn.execute("UPDATE pedidos SET status=? WHERE id=?", ("aprovado" if aprovar else "recusado", pedido_id))
+        conn.execute("UPDATE pedidos SET status=?, aprovado_em=? WHERE id=?",
+                     ("aprovado" if aprovar else "recusado",
+                      datetime.now().isoformat(timespec="seconds") if aprovar else None, pedido_id))
+
+
+def receber_pedido(pedido_id: int) -> dict:
+    """Fornecedor entregou um pedido aprovado: os itens entram no estoque (validade padrão de cada produto)
+    e o valor sai do caixa (compra paga na entrega). Só o dono/interface ou a simulação chamam."""
+    with conectar() as conn:
+        p = conn.execute("SELECT * FROM pedidos WHERE id=?", (pedido_id,)).fetchone()
+        if not p or p["status"] != "aprovado" or p["recebido_em"]:
+            return {"erro": "Pedido não está aprovado ou já foi recebido."}
+        itens = json.loads(p["itens_json"])
+        validades = {r["nome"]: r["v"] for r in conn.execute(
+            "SELECT nome, COALESCE(validade_padrao_dias, 7) v FROM produtos")}
+    lancados = []
+    for i in itens:
+        validade = (_hoje() + timedelta(days=int(validades.get(i["produto"], 7)))).strftime("%d/%m/%Y")
+        r = registrar_entrada(i["produto"], float(i["quantidade"]), validade)
+        if r.get("ok"):
+            lancados.append(i["produto"])
+    with conectar() as conn:
+        conn.execute("UPDATE pedidos SET recebido_em=? WHERE id=?", (datetime.now().isoformat(timespec="seconds"), pedido_id))
+    return {"ok": True, "pedido_id": pedido_id, "fornecedor": p["fornecedor"], "itens_recebidos": lancados,
+            "valor_rs": p["valor_estimado"]}
+
+
+def financeiro_do_dia() -> dict:
+    """Fechamento do dia (usado pela tela e pelo agente).
+
+    - Caixa do dia  = entradas (vendas) − saídas (compras recebidas/produção + despesas). Pode ser negativo.
+    - Lucro do dia  = vendas − custo do que foi vendido − perdas − despesas. Compra não é prejuízo: vira estoque.
+    - A pagar       = pedidos aprovados que ainda não chegaram (compromisso com fornecedor).
+    """
+    hoje = _hoje().isoformat()
+    with conectar() as conn:
+        r = conn.execute(
+            """SELECT
+                 COALESCE(SUM(CASE WHEN m.tipo='venda' THEN m.valor END),0)                       AS vendas,
+                 COALESCE(SUM(CASE WHEN m.tipo='venda' THEN m.quantidade*p.preco_custo END),0)    AS custo_vendas,
+                 COALESCE(SUM(CASE WHEN m.tipo='entrada' THEN m.valor END),0)                     AS compras,
+                 COALESCE(SUM(CASE WHEN m.tipo='perda' THEN m.valor END),0)                       AS perdas,
+                 COUNT(CASE WHEN m.tipo='venda' THEN 1 END)                                        AS n_vendas
+               FROM movimentacoes m JOIN produtos p ON p.id=m.produto_id WHERE m.data=?""", (hoje,)).fetchone()
+        tem_despesas = conn.execute("SELECT 1 FROM sqlite_master WHERE name='despesas'").fetchone()
+        despesas = conn.execute("SELECT COALESCE(SUM(valor),0) v FROM despesas WHERE data=?", (hoje,)
+                                ).fetchone()["v"] if tem_despesas else 0.0
+        rasc = conn.execute("SELECT COUNT(*) n, COALESCE(SUM(valor_estimado),0) v FROM pedidos WHERE status='rascunho'"
+                            ).fetchone()
+        apagar = conn.execute("SELECT COUNT(*) n, COALESCE(SUM(valor_estimado),0) v FROM pedidos "
+                              "WHERE status='aprovado' AND recebido_em IS NULL").fetchone()
+        excessos = [json.loads(x["conteudo"]) for x in conn.execute(
+            "SELECT conteudo FROM log_agente WHERE tipo='alerta_excesso'")]
+    excessos = [e for e in excessos if e.get("data") == hoje]
+    vendas, custo, compras, perdas = r["vendas"], r["custo_vendas"], r["compras"], r["perdas"]
+    lucro_bruto = vendas - custo - perdas
+    lucro = lucro_bruto - despesas
+    saidas = compras + despesas
+    return {"vendas_rs": round(vendas, 2), "custo_vendas_rs": round(custo, 2), "compras_rs": round(compras, 2),
+            "despesas_rs": round(despesas, 2), "perdas_rs": round(perdas, 2), "saidas_caixa_rs": round(saidas, 2),
+            "caixa_rs": round(vendas - saidas, 2), "lucro_bruto_rs": round(lucro_bruto, 2), "lucro_rs": round(lucro, 2),
+            "margem": (lucro / vendas) if vendas else 0.0, "n_vendas": r["n_vendas"],
+            "ticket_medio_rs": round(vendas / r["n_vendas"], 2) if r["n_vendas"] else 0.0,
+            "pedidos_pendentes": rasc["n"], "pedidos_pendentes_rs": round(rasc["v"], 2),
+            "a_pagar_n": apagar["n"], "a_pagar_rs": round(apagar["v"], 2),
+            "excesso_rs": round(sum(e["excesso_rs"] for e in excessos), 2), "n_excessos": len(excessos)}
+
+
+def resumo_do_dia() -> dict:
+    """Resultado financeiro de HOJE, em tempo real: vendas, caixa, lucro, despesas, compras, perdas,
+    compras em excesso (que vão virar lixo), pedidos aguardando aprovação e valores a pagar a fornecedores.
+    Use para perguntas como "quanto vendi hoje?", "como está o caixa?", "quanto lucrei?"."""
+    f = financeiro_do_dia()
+    return {"data": _hoje().isoformat(), "vendas_rs": f["vendas_rs"], "numero_de_vendas": f["n_vendas"],
+            "ticket_medio_rs": f["ticket_medio_rs"], "caixa_do_dia_rs": f["caixa_rs"],
+            "lucro_do_dia_rs": f["lucro_rs"], "margem": f"{f['margem']:.0%}", "lucro_bruto_rs": f["lucro_bruto_rs"],
+            "despesas_rs": f["despesas_rs"], "compras_recebidas_rs": f["compras_rs"], "perdas_rs": f["perdas_rs"],
+            "compras_em_excesso_rs": f["excesso_rs"], "pedidos_aguardando_aprovacao": f["pedidos_pendentes"],
+            "a_pagar_fornecedores_rs": f["a_pagar_rs"],
+            "explicacao": "caixa = vendas − compras recebidas − despesas; lucro = vendas − custo do vendido − perdas − despesas"}
+
+
+# ferramenta financeira (definida mais abaixo no arquivo) também vai para o agente
+FERRAMENTAS.insert(0, resumo_do_dia)

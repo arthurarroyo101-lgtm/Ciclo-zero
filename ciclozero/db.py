@@ -91,3 +91,8 @@ def criar_tabelas() -> None:
         colunas = {r["name"] for r in conn.execute("PRAGMA table_info(produtos)")}
         if "validade_padrao_dias" not in colunas:
             conn.execute("ALTER TABLE produtos ADD COLUMN validade_padrao_dias INTEGER DEFAULT 7")
+        col_ped = {r["name"] for r in conn.execute("PRAGMA table_info(pedidos)")}
+        if "aprovado_em" not in col_ped:
+            conn.execute("ALTER TABLE pedidos ADD COLUMN aprovado_em TEXT")
+        if "recebido_em" not in col_ped:
+            conn.execute("ALTER TABLE pedidos ADD COLUMN recebido_em TEXT")

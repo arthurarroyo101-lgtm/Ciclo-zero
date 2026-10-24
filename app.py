@@ -50,6 +50,9 @@ with st.sidebar:
     chave = "" if tem_env else st.text_input("Chave do Gemini", type="password")
     from ciclozero import ao_vivo as _ao_vivo
     _ao_vivo.controles()
+    tecnico = st.toggle("🔧 Modo técnico", key="tecnico", value=False,
+                        help="Mostra o que é para a equipe e a banca: como o agente decidiu, fórmulas, lançamentos "
+                             "detalhados e a aba Rastreio. Desligado = visão limpa do comerciante.")
     if st.button("🔄 Recriar dados de exemplo"):
         from ciclozero.seed import popular
         _ao_vivo.simulador().parar()  # não escrever no banco enquanto ele é recriado
@@ -65,8 +68,10 @@ risco = tools.analisar_risco_desperdicio()
 vencendo = tools.listar_produtos_vencendo(3)
 perdas = tools.relatorio_desperdicio(30)
 
-aba_chat, aba_nota, aba_dash, aba_painel, aba_pedidos, aba_log = st.tabs(
-    ["💬 Agente", "📷 Nota fiscal", "📊 Dashboard", "📦 Estoque", "🧾 Pedidos", "🔍 Rastreio"])
+_nomes_abas = ["💬 Agente", "📷 Nota fiscal", "📊 Dashboard", "📦 Estoque", "🧾 Pedidos"]
+_abas = st.tabs(_nomes_abas + (["🔍 Rastreio"] if tecnico else []))
+aba_chat, aba_nota, aba_dash, aba_painel, aba_pedidos = _abas[:5]
+aba_log = _abas[5] if tecnico else st.empty()  # Rastreio só no modo técnico
 
 with aba_nota:  # módulo separado (Matheus) para não conflitar com o resto da interface
     from ciclozero import ui_nota
@@ -101,7 +106,7 @@ with aba_chat:
                     st.markdown(conteudo["resposta"])
                     if ui_agente.tem_plano(passos) and not conteudo.get("erro_sistema"):
                         ui_agente.render_plano(passos)
-                if passos:
+                if passos and tecnico:
                     with st.expander(f"🔧 Como o agente chegou nisso ({len(passos)} ferramenta(s))"):
                         for i, p in enumerate(passos, 1):
                             st.markdown(f"**{i}. {ui_agente.nome_amigavel(p['ferramenta'])}** · "
@@ -122,29 +127,34 @@ with aba_dash:
         perdas = tools.relatorio_desperdicio(30)
         fin = ao_vivo.financeiro_do_dia()
         with st.container(border=True):
-            st.markdown("#### 💰 Resultado de hoje" + ("  ·  🟢 ao vivo" if ao_vivo.simulador().ativo else ""))
+            st.markdown("#### 💰 Hoje" + ("  ·  🟢 ao vivo" if ao_vivo.simulador().ativo else ""))
+            esc = lambda v: reais(v).replace("$", "\\$")
             f1, f2, f3 = st.columns(3)
-            f1.metric("Entradas (vendas)", reais(fin["vendas_rs"]), f"{fin['n_vendas']} vendas", delta_color="off")
-            f2.metric("Saídas do caixa", reais(fin["saidas_caixa_rs"]),
-                      f"compras {reais(fin['compras_rs'])} · despesas {reais(fin['despesas_rs'])}".replace("$", "\\$"), delta_color="off")
-            f3.metric("Caixa do dia", reais(fin["caixa_rs"]))
+            f1.metric("Vendas", reais(fin["vendas_rs"]), f"{fin['n_vendas']} vendas", delta_color="off",
+                      help=f"Ticket médio {reais(fin['ticket_medio_rs'])}")
+            f2.metric("Caixa", reais(fin["caixa_rs"]),
+                      help=f"Vendas − compras recebidas ({reais(fin['compras_rs'])}) − despesas "
+                           f"({reais(fin['despesas_rs'])}). Pode fechar negativo em dia de muita compra.")
+            f3.metric("Lucro", reais(fin["lucro_rs"]), f"margem {fin['margem']:.0%}", delta_color="off",
+                      help="Vendas − custo do que foi vendido − perdas − despesas. Compra não é prejuízo: vira estoque.")
             f4, f5, f6 = st.columns(3)
-            f4.metric("Lucro do dia", reais(fin["lucro_rs"]),
-                      f"bruto {reais(fin['lucro_bruto_rs'])} · margem {fin['margem']:.0%}".replace("$", "\\$"),
-                      delta_color="off")
-            f5.metric("🚨 Compras em excesso hoje", reais(fin["excesso_rs"]),
-                      f"{fin['n_excessos']} compra(s)/fornada(s) acima do que vende", delta_color="off")
-            f6.metric("Pedidos p/ aprovar", fin["pedidos_pendentes"], reais(fin["pedidos_pendentes_rs"]).replace("$", "\\$"),
-                      delta_color="off")
-            st.caption("**Caixa do dia** = vendas − (compras e produção pagas + despesas): pode fechar negativo em dia de "
-                       "muita compra. **Lucro do dia** = vendas − custo do que foi vendido − perdas − despesas. "
-                       "**Compras em excesso** = custo do que entrou além do que a loja vende antes de vencer — "
-                       "é o dinheiro que o Ciclo Zero evita gastar.")
-            ao_vivo.render_alertas_excesso()
-            mov = ao_vivo.tabela_movimento()
-            if not mov.empty:
-                st.markdown("##### Últimos lançamentos")
-                st.dataframe(mov, width="stretch", hide_index=True, height=250)
+            f4.metric("🚨 Comprado em excesso", reais(fin["excesso_rs"]),
+                      f"{fin['n_excessos']} compra(s) acima do que vende" if fin["n_excessos"] else None,
+                      delta_color="off",
+                      help="Custo do que entrou além do que a loja consegue vender antes de vencer: vai virar lixo.")
+            f5.metric("A pagar a fornecedores", reais(fin["a_pagar_rs"]),
+                      f"{fin['a_pagar_n']} pedido(s) aprovado(s)" if fin["a_pagar_n"] else None, delta_color="off",
+                      help="Pedidos aprovados que ainda não chegaram. Quando chegam, entram no estoque e saem do caixa.")
+            f6.metric("Pedidos p/ aprovar", fin["pedidos_pendentes"],
+                      esc(fin["pedidos_pendentes_rs"]) if fin["pedidos_pendentes"] else None, delta_color="off")
+            ao_vivo.render_alertas_excesso(maximo=2)
+            if tecnico:
+                st.caption("Caixa = vendas − (compras/produção + despesas) · Lucro = vendas − custo do vendido − perdas − "
+                           "despesas · Excesso = custo do que entrou além do que a loja vende antes de vencer.")
+                mov = ao_vivo.tabela_movimento()
+                if not mov.empty:
+                    st.markdown("##### Últimos lançamentos (modo técnico)")
+                    st.dataframe(mov, width="stretch", hide_index=True, height=250)
         from ciclozero import graficos
 
         hist = tools.historico_diario(30)
@@ -153,8 +163,9 @@ with aba_dash:
         df_cat = graficos.dados_perdas_por_categoria(hist)
         df_dia = graficos.dados_vendas_x_perdas(hist)
 
-        st.caption("Todos os números saem do banco, pelas mesmas ferramentas que o agente usa. "
-                   "Perdas e risco são medidos pelo custo do produto.")
+        if tecnico:
+            st.caption("Todos os números saem do banco, pelas mesmas ferramentas que o agente usa. "
+                       "Perdas e risco são medidos pelo custo do produto.")
 
         col_a, col_b = st.columns(2)
         with col_a, st.container(border=True):
@@ -215,18 +226,27 @@ with aba_pedidos:
         pedidos = tools.listar_pedidos()
         if not pedidos:
             st.info("Nenhum pedido ainda. Rode a rotina diária ou peça ao agente para calcular a reposição.")
+        rotulo = {"rascunho": "📝 aguardando sua aprovação", "aprovado": "✅ aprovado · aguardando entrega",
+                  "recebido": "📦 recebido", "recusado": "❌ recusado"}
         for p in pedidos:
+            estado = "recebido" if p.get("recebido_em") else p["status"]
             with st.container(border=True):
-                st.markdown(f"**Pedido #{p['id']} — {p['fornecedor']}** · {reais(p['valor_estimado'])} · `{p['status']}`")
-                st.caption(p["justificativa"] or "")
-                st.dataframe(pd.DataFrame(p["itens"]), hide_index=True)
-                if p["status"] == "rascunho":
+                st.markdown(f"**#{p['id']} · {p['fornecedor']}** · {reais(p['valor_estimado'])} · {rotulo.get(estado, estado)}")
+                st.caption(" · ".join(f"{i['produto']}: {i['quantidade']:g} {i.get('unidade', '')}" for i in p["itens"]))
+                if tecnico and p.get("justificativa"):
+                    st.caption(p["justificativa"])
+                if estado == "rascunho":
                     a, b = st.columns(2)
                     if a.button("✅ Aprovar", key=f"ok{p['id']}"):
                         tools.decidir_pedido(p["id"], True)
                         st.rerun()
                     if b.button("❌ Recusar", key=f"no{p['id']}"):
                         tools.decidir_pedido(p["id"], False)
+                        st.rerun()
+                elif estado == "aprovado":
+                    if st.button("📦 Marcar como recebido", key=f"rec{p['id']}",
+                                 help="A mercadoria chegou: entra no estoque e o valor sai do caixa."):
+                        tools.receber_pedido(p["id"])
                         st.rerun()
     _aba_pedidos()
 
@@ -255,4 +275,5 @@ with aba_log:
         with conectar() as conn:
             log = pd.read_sql("SELECT sessao, passo, tipo, conteudo, criado_em FROM log_agente ORDER BY id DESC LIMIT 200", conn)
         st.dataframe(log, width="stretch", hide_index=True)
-    _aba_rastreio()
+    if tecnico:  # Rastreio é só para a equipe/banca
+        _aba_rastreio()

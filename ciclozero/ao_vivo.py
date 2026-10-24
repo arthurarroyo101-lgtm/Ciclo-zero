@@ -144,7 +144,19 @@ class Simulador:
         return vendidos
 
     def _chegada(self) -> dict | None:
-        """Fornecedor entrega um produto que está acabando (validade padrão do produto)."""
+        """Fornecedor entrega: primeiro os pedidos que o dono APROVOU (certos, sem excesso);
+        senão, uma compra avulsa de algo que está acabando (às vezes exagerada)."""
+        aprovados = [p for p in tools.listar_pedidos("aprovado") if not p.get("recebido_em")]
+        if aprovados:
+            p = aprovados[-1]  # o mais antigo
+            r = tools.receber_pedido(p["id"])
+            if r.get("ok"):
+                return self._registrar("recebido", f"pedido #{p['id']} {p['fornecedor']}", len(r["itens_recebidos"]),
+                                       "item(ns)", r["valor_rs"])
+        return self._chegada_avulsa()
+
+    def _chegada_avulsa(self) -> dict | None:
+        """Compra avulsa (sem o Ciclo Zero) de um produto que está acabando."""
         itens = tools.consultar_estoque()["itens"]
         faltando = [i for i in itens if i["saldo"] < max(i["estoque_minimo"], i["media_vendas_dia"] * 3)
                     and i["produto"] not in self._producao_propria()]  # pão/bolo saem do forno (ver _producao)
@@ -232,39 +244,7 @@ def vendas_de_hoje() -> dict:
 
 
 def financeiro_do_dia() -> dict:
-    """Fechamento do dia a partir das movimentações e despesas.
-
-    - Caixa do dia  = entradas (vendas) − saídas (compras/produção pagas + despesas). Pode ser negativo.
-    - Lucro do dia  = lucro bruto (vendas − custo do que foi vendido − perdas) − despesas operacionais.
-    Compras não são "prejuízo": viram estoque. Por isso caixa e lucro andam diferentes num dia de muita compra.
-    """
-    hoje = date.today().isoformat()
-    with conectar() as conn:
-        r = conn.execute(
-            """SELECT
-                 COALESCE(SUM(CASE WHEN m.tipo='venda' THEN m.valor END),0)                       AS vendas,
-                 COALESCE(SUM(CASE WHEN m.tipo='venda' THEN m.quantidade*p.preco_custo END),0)    AS custo_vendas,
-                 COALESCE(SUM(CASE WHEN m.tipo='entrada' THEN m.valor END),0)                     AS compras,
-                 COALESCE(SUM(CASE WHEN m.tipo='perda' THEN m.valor END),0)                       AS perdas,
-                 COUNT(CASE WHEN m.tipo='venda' THEN 1 END)                                        AS n_vendas
-               FROM movimentacoes m JOIN produtos p ON p.id=m.produto_id WHERE m.data=?""", (hoje,)).fetchone()
-        despesas = conn.execute("SELECT COALESCE(SUM(valor),0) v FROM despesas WHERE data=?", (hoje,)).fetchone()["v"]
-        pend = conn.execute("SELECT COUNT(*) n, COALESCE(SUM(valor_estimado),0) v FROM pedidos WHERE status='rascunho'"
-                            ).fetchone()
-        excessos = [json.loads(x["conteudo"]) for x in conn.execute(
-            "SELECT conteudo FROM log_agente WHERE tipo='alerta_excesso'")]
-    excessos = [e for e in excessos if e.get("data") == hoje]
-    vendas, custo, compras, perdas = r["vendas"], r["custo_vendas"], r["compras"], r["perdas"]
-    lucro_bruto = vendas - custo - perdas
-    lucro = lucro_bruto - despesas
-    saidas = compras + despesas
-    return {"vendas_rs": round(vendas, 2), "custo_vendas_rs": round(custo, 2), "compras_rs": round(compras, 2),
-            "despesas_rs": round(despesas, 2), "perdas_rs": round(perdas, 2), "saidas_caixa_rs": round(saidas, 2),
-            "caixa_rs": round(vendas - saidas, 2), "lucro_bruto_rs": round(lucro_bruto, 2), "lucro_rs": round(lucro, 2),
-            "margem": (lucro / vendas) if vendas else 0.0, "n_vendas": r["n_vendas"],
-            "ticket_medio_rs": round(vendas / r["n_vendas"], 2) if r["n_vendas"] else 0.0,
-            "pedidos_pendentes": pend["n"], "pedidos_pendentes_rs": round(pend["v"], 2),
-            "excesso_rs": round(sum(e["excesso_rs"] for e in excessos), 2), "n_excessos": len(excessos)}
+    return tools.financeiro_do_dia()
 
 
 # ------------------------------------------------------------------ interface
@@ -352,7 +332,7 @@ def tabela_movimento():
     import pandas as pd
     nomes = {"venda": "🛒 Venda (entra no caixa)", "chegada": "🚚 Compra recebida (sai do caixa)",
              "producao": "🍞 Produção (insumos saem do caixa)", "despesa": "💸 Despesa paga",
-             "excesso": "🚨 Em excesso (vai sobrar)",
+             "excesso": "🚨 Em excesso (vai sobrar)", "recebido": "📦 Pedido aprovado recebido (sai do caixa)",
              "perda": "🗑️ Perda (estragou)", "pedido": "📝 Pedido automático (rascunho)"}
     linhas = [{"hora": e["hora"],
                "lançamento": nomes.get(e.get("tipo"), e.get("tipo")) + (" · 🚨 EXCESSO" if e.get("excesso") else ""),
@@ -362,10 +342,10 @@ def tabela_movimento():
     return pd.DataFrame(linhas)
 
 
-def render_alertas_excesso() -> None:
+def render_alertas_excesso(maximo: int = 3) -> None:
     """O problema, mostrado na hora em que acontece: compra/produção acima do que a loja vende antes de vencer."""
     import streamlit as st
-    for a in list(simulador().alertas)[:3]:
+    for a in list(simulador().alertas)[:maximo]:
         u = a["unidade"]
         verbo = "Saíram do forno" if a["origem"] == "producao" else "Chegaram"
         st.warning(
@@ -409,7 +389,7 @@ def painel() -> None:
                  "vendas": hoje["vendas"], "caixa": fin["caixa_rs"], "lucro": fin["lucro_rs"]}
 
         if sim.ativo:
-            st.markdown("🟢 **Loja ao vivo** — *simulação de vendas do caixa; números atualizando em tempo real*")
+            st.caption("🟢 **ao vivo**" + (" — simulação acelerada de um dia de loja" if st.session_state.get("tecnico") else ""))
         de = lambda k: anterior.get(k, atual[k])
         _cartoes([
             {"rotulo": "Vendas hoje", "tipo": "reais", "de": de("fat"), "para": atual["fat"]},
@@ -422,8 +402,9 @@ def painel() -> None:
             {"rotulo": "Perdas · 30 dias", "tipo": "reais", "de": perdas["total_perdas_rs"],
              "para": perdas["total_perdas_rs"], "nota": perdas["perdas_sobre_faturamento"].replace(".", ",") + " do faturamento"},
         ])
-        if sim.ativo and sim.eventos:
-            icone = {"venda": "🛒", "chegada": "🚚", "perda": "🗑️", "pedido": "📝", "producao": "🍞", "despesa": "💸"}
+        if sim.ativo and sim.eventos and st.session_state.get("tecnico"):
+            icone = {"venda": "🛒", "chegada": "🚚", "perda": "🗑️", "pedido": "📝", "producao": "🍞", "despesa": "💸",
+                     "recebido": "📦"}
             st.caption("Movimento: " + " · ".join(
                 f"{'🚨' if e.get('excesso') else icone.get(e.get('tipo'), '🛒')} {e['hora']} {e['quantidade']:g} {e['unidade']} {e['produto']}"
                 for e in list(sim.eventos)[:5]) + "  ·  🛒 venda  🍞 produção  🚚 chegada  💸 despesa  🗑️ estragou  📝 pedido")

@@ -162,6 +162,11 @@ def _c_reposicao_explicada(r, a):
                 f"inventou parâmetro={'sim' if inventou_parametro else 'não'}")
 
 
+def _c_resumo_dia(r, a):
+    fs = ferramentas(r)
+    return "resumo_do_dia" in fs, f"ferramentas={fs}"
+
+
 CASOS = [
     ("C01", "uso normal", "O que vai vencer nos próximos 3 dias?", _c_vencendo),
     ("C02", "uso normal", "Chegaram 30 unidades de leite integral com validade 30/12/2026, registra aí.", _c_entrada),
@@ -177,6 +182,7 @@ CASOS = [
                           "estoque mínimo 3 kg, fornecedor Frigorífico Goiás, entrega em 3 dias.", _c_cadastro),
     ("C12", "fidelidade", "Quanto devo pedir de leite integral? Me explica a conta e de onde vêm os dias de cobertura.",
      _c_reposicao_explicada),
+    ("C13", "tempo real", "Quanto vendi hoje e como está o caixa?", _c_resumo_dia),
 ]
 
 
