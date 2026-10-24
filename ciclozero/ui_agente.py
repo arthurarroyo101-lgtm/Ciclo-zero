@@ -146,3 +146,86 @@ def render_plano(passos: list[dict]) -> None:
                         _cartao_pedido(p)
         else:
             st.info("Nenhuma reposição necessária agora.")
+
+
+# ------------------------------------------------------------------ boas-vindas e estilo
+
+CSS = """
+<style>
+/* caixa de mensagem do agente: maior, com borda verde e sombra para chamar atenção */
+[data-testid="stChatInput"] {
+    border: 2px solid #2E7D32 !important;
+    border-radius: 16px !important;
+    box-shadow: 0 6px 22px rgba(46, 125, 50, .18) !important;
+    background: #FFFFFF !important;
+    padding: 4px 6px !important;
+}
+[data-testid="stChatInput"] textarea {
+    font-size: 1.08rem !important;
+    min-height: 3.2rem !important;
+}
+[data-testid="stChatInput"] textarea::placeholder { color: #5F7F61 !important; opacity: 1 !important; }
+[data-testid="stChatInput"]:focus-within { box-shadow: 0 6px 26px rgba(46, 125, 50, .32) !important; }
+.cz-pergunta { font-size: 1.15rem; font-weight: 700; color: #1B5E20; margin: .6rem 0 .25rem; }
+
+/* barra lateral */
+.cz-boasvindas { font-size: 1.05rem; line-height: 1.45; margin-bottom: .2rem; }
+.cz-boasvindas b { color: #1B5E20; }
+.cz-marca { display: flex; align-items: center; gap: .55rem; margin: .6rem 0 .9rem; }
+.cz-marca img { width: 44px; height: 44px; object-fit: contain; }
+.cz-marca .cz-icone { font-size: 2.3rem; line-height: 1; }
+.cz-marca .cz-nome { font-size: 1.7rem; font-weight: 800; color: #1B5E20; letter-spacing: -.01em; }
+.cz-dor { background: #F1F8F1; border-left: 4px solid #2E7D32; border-radius: 10px;
+          padding: .8rem .9rem; margin-bottom: 1rem; }
+.cz-dor h4 { margin: 0 0 .35rem; font-size: 1rem; color: #1B5E20; }
+.cz-dor p { margin: 0; font-size: .9rem; line-height: 1.45; color: #2F3B30; }
+</style>
+"""
+
+TEXTO_DOR = (
+    "Sem um bom controle, produtos podem vencer, faltar quando seus clientes precisam ou ficar parados "
+    "ocupando espaço e dinheiro. Acompanhe o que entra e sai, confira as quantidades e fique atento às "
+    "datas de validade para reduzir perdas e manter seu estoque sempre organizado."
+)
+
+
+def aplicar_estilo() -> None:
+    st.markdown(CSS, unsafe_allow_html=True)
+
+
+def nome_usuario(padrao: str = "usuário") -> str:
+    """Nome de quem está usando: login do Streamlit (se configurado) ou o nome digitado na barra lateral."""
+    try:
+        if st.user.is_logged_in and st.user.get("name"):
+            return str(st.user.get("name")).split()[0]
+    except Exception:  # login não configurado nesta instalação
+        pass
+    return (st.session_state.get("nome_usuario") or "").strip() or padrao
+
+
+def _logo_html() -> str:
+    """Usa assets/logo.png se existir; senão, o símbolo ♻️."""
+    import base64
+    from pathlib import Path
+
+    for nome in ("logo.png", "logo.jpg", "logo.svg"):
+        arq = Path(__file__).resolve().parent.parent / "assets" / nome
+        if arq.exists():
+            tipo = "svg+xml" if arq.suffix == ".svg" else arq.suffix[1:].replace("jpg", "jpeg")
+            dados = base64.b64encode(arq.read_bytes()).decode()
+            return f"<img src='data:image/{tipo};base64,{dados}' alt='Ciclo Zero'>"
+    return "<span class='cz-icone'>♻️</span>"
+
+
+def cabecalho_lateral() -> None:
+    """Boas-vindas com o nome da pessoa, marca do Ciclo Zero e o porquê do controle de estoque."""
+    from html import escape
+
+    nome = escape(nome_usuario())
+    st.markdown(
+        f"<div class='cz-boasvindas'>Bem-vindo, <b>{nome}</b>!<br>"
+        "Sou o agente que te ajuda no controle de estoque.</div>"
+        f"<div class='cz-marca'>{_logo_html()}<span class='cz-nome'>Ciclo Zero</span></div>"
+        f"<div class='cz-dor'><h4>Controle de estoque sem complicação</h4><p>{TEXTO_DOR}</p></div>",
+        unsafe_allow_html=True,
+    )

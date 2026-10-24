@@ -43,9 +43,10 @@ def get_agente(chave: str | None):
     return AgenteCicloZero(api_key=chave or None)
 
 
+ui_agente.aplicar_estilo()
+
 with st.sidebar:
-    st.title("♻️ Ciclo Zero")
-    st.caption("Agente de IA contra o desperdício de alimentos no pequeno comércio")
+    ui_agente.cabecalho_lateral()
     tem_env = bool(os.getenv("GEMINI_API_KEY") or os.getenv("GROQ_API_KEY"))
     chave = "" if tem_env else st.text_input("Chave do Gemini", type="password")
     from ciclozero import ao_vivo as _ao_vivo
@@ -53,6 +54,9 @@ with st.sidebar:
     tecnico = st.toggle("🔧 Modo técnico", key="tecnico", value=False,
                         help="Mostra o que é para a equipe e a banca: como o agente decidiu, fórmulas, lançamentos "
                              "detalhados e a aba Rastreio. Desligado = visão limpa do comerciante.")
+    with st.expander("👤 Personalizar"):
+        st.text_input("Seu nome", key="nome_usuario", placeholder="Ex.: João",
+                      help="Aparece na mensagem de boas-vindas. Com login configurado, o nome vem dele.")
     if st.button("🔄 Recriar dados de exemplo"):
         from ciclozero.seed import popular
         _ao_vivo.simulador().parar()  # não escrever no banco enquanto ele é recriado
@@ -112,7 +116,10 @@ with aba_chat:
                             st.markdown(f"**{i}. {ui_agente.nome_amigavel(p['ferramenta'])}** · "
                                         f"`{p['ferramenta']}({p['argumentos']})`")
                             st.json(p["resultado"], expanded=False)
-        if msg := st.chat_input("Ex.: chegaram 30 litros de leite com validade 30/10/2026"):
+        st.markdown("<div class='cz-pergunta'>💬 Qual a dúvida de hoje?</div>", unsafe_allow_html=True)
+        st.caption("Ex.: chegaram 30 litros de leite com validade 30/10/2026 · o que vence essa semana? · "
+                   "quanto devo pedir de leite?")
+        if msg := st.chat_input("Qual a dúvida de hoje?"):
             st.session_state.chat.append(("user", msg))
             with st.status("O agente está trabalhando...", expanded=True) as status:
                 agente.ao_passo = lambda t: status.write(ui_agente.passo_amigavel(t))
