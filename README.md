@@ -6,8 +6,8 @@ Projeto do AKCIT Camp 2026 — Hackathon Regional Centro-Oeste.
 
 ## Equipe
 - Matheus — agente de IA e ferramentas
-- João Paulo ([@joaopaulo167](https://github.com/joaopaulo167)) — interface e dados
-- Arthur ([@arthurarroyo101-lgtm](https://github.com/arthurarroyo101-lgtm)) — negócio, pitch e validação
+- João Paulo ([@joaopaulo167](https://github.com/joaopaulo167)) — interface e dados.
+- Arthur ([@arthurarroyo101-lgtm](https://github.com/arthurarroyo101-lgtm)) — negócio, pitch e validação.
 
 ## Como rodar
 ```bash
