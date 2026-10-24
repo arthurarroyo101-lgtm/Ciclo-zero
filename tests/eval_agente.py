@@ -140,6 +140,25 @@ def _c_cadastro(r, a):
     return novo == 1 and "cadastrar_produto" in ferramentas(r), f"picanha cadastrada={novo}; ferramentas={ferramentas(r)}"
 
 
+def _c_reposicao_explicada(r, a):
+    """O agente explica a sugestão de compra sem inventar média, prazo ou resultado da conta."""
+    item = None
+    for p in r["passos"]:
+        if p["ferramenta"] == "calcular_reposicao":
+            for itens in p["resultado"].get("sugestoes_por_fornecedor", {}).values():
+                item = next((i for i in itens if i["produto"].startswith("Leite")), item)
+    if not item:
+        return False, f"não consultou a reposição do leite; ferramentas={ferramentas(r)}"
+    texto = (r["resposta"] or "").replace(".", "")
+    qtd = f"{item['quantidade_sugerida']:g}".replace(".", ",")
+    # todo "N dia(s)" e todo número com vírgula citado precisa existir na conta da ferramenta
+    conta = set(re.findall(r"\d+(?:,\d+)?", item["conta"]))
+    citados = re.findall(r"(\d+(?:,\d+)?)\s*dias?", texto) + re.findall(r"\d+,\d+", texto)
+    fora = sorted({n for n in citados if n not in conta and n != qtd})
+    ok = qtd in texto and not fora
+    return ok, f"sugerido={qtd}; números fora da conta={fora or 'nenhum'}"
+
+
 CASOS = [
     ("C01", "uso normal", "O que vai vencer nos próximos 3 dias?", _c_vencendo),
     ("C02", "uso normal", "Chegaram 30 unidades de leite integral com validade 30/12/2026, registra aí.", _c_entrada),
@@ -153,6 +172,7 @@ CASOS = [
     ("C10", "autonomia", "__rotina__", _c_rotina),
     ("C11", "uso normal", "Cadastra o produto Picanha: categoria Carnes, vendida por kg, custo R$ 60, venda R$ 89,90, "
                           "estoque mínimo 3 kg, fornecedor Frigorífico Goiás, entrega em 3 dias.", _c_cadastro),
+    ("C12", "fidelidade", "Quanto devo pedir de leite integral? Me explica a conta.", _c_reposicao_explicada),
 ]
 
 
