@@ -23,7 +23,13 @@ DESCONTO_MAX = 0.5           # guardrail: nunca sugerir mais que 50% de desconto
 
 # ----------------------------------------------------------------- utilitários
 def _hoje() -> date:
-    return date.today()
+    from . import relogio
+    return relogio.hoje()  # data da loja (com a Loja ao vivo, o dia anda acelerado)
+
+
+def _agora() -> datetime:
+    from . import relogio
+    return relogio.agora()
 
 
 def ler_data(txt: str) -> date:
@@ -449,7 +455,7 @@ def criar_pedido_compra(fornecedor: str, produtos: list[str], quantidades: list[
         cur = conn.execute(
             "INSERT INTO pedidos (fornecedor, itens_json, valor_estimado, status, justificativa, criado_em) VALUES (?,?,?,?,?,?)",
             (fornecedor, json.dumps(itens, ensure_ascii=False), round(total, 2), "rascunho", justificativa,
-             datetime.now().isoformat(timespec="seconds")),
+             _agora().isoformat(timespec="seconds")),
         )
         return {"ok": True, "pedido_id": cur.lastrowid, "status": "rascunho (aguardando aprovação do dono)",
                 "fornecedor": fornecedor, "itens": itens, "valor_estimado": round(total, 2)}
@@ -544,7 +550,7 @@ def decidir_pedido(pedido_id: int, aprovar: bool) -> None:
     with conectar() as conn:
         conn.execute("UPDATE pedidos SET status=?, aprovado_em=? WHERE id=?",
                      ("aprovado" if aprovar else "recusado",
-                      datetime.now().isoformat(timespec="seconds") if aprovar else None, pedido_id))
+                      _agora().isoformat(timespec="seconds") if aprovar else None, pedido_id))
 
 
 def receber_pedido(pedido_id: int) -> dict:
@@ -564,7 +570,7 @@ def receber_pedido(pedido_id: int) -> dict:
         if r.get("ok"):
             lancados.append(i["produto"])
     with conectar() as conn:
-        conn.execute("UPDATE pedidos SET recebido_em=? WHERE id=?", (datetime.now().isoformat(timespec="seconds"), pedido_id))
+        conn.execute("UPDATE pedidos SET recebido_em=? WHERE id=?", (_agora().isoformat(timespec="seconds"), pedido_id))
     return {"ok": True, "pedido_id": pedido_id, "fornecedor": p["fornecedor"], "itens_recebidos": lancados,
             "valor_rs": p["valor_estimado"]}
 

@@ -14,6 +14,7 @@ from pathlib import Path
 DB_PATH = Path(os.getenv("CICLOZERO_DB", Path(__file__).resolve().parent.parent / "ciclozero.db"))
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT);
 CREATE TABLE IF NOT EXISTS produtos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nome TEXT UNIQUE NOT NULL,

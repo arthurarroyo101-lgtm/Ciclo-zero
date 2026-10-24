@@ -306,6 +306,9 @@ button [data-testid="stIconMaterial"] { font-size: 1.15em; }
 .stTabs [data-baseweb="tab-panel"] { padding-top: 18px; }
 .cz-aovivo { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--folha); }
 .cz-aovivo small { font-weight: 400; color: var(--tinta-2); }
+.cz-relogio { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; font-size: 14px; color: var(--tinta-2); margin-bottom: 6px; }
+.cz-relogio .cz-hora { font-weight: 700; color: var(--tinta); font-variant-numeric: tabular-nums; }
+.cz-relogio .cz-ontem { margin-left: auto; }
 .cz-pulso { width: 9px; height: 9px; border-radius: 50%; background: var(--folha); position: relative; }
 .cz-pulso::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--folha);
                    animation: cz-pulso 1.6s ease-out infinite; }

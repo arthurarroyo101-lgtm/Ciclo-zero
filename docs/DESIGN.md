@@ -43,9 +43,9 @@ Verde não é decoração: é marca e ação. Vermelho só significa problema. A
 ## O que NÃO fazer (vícios de interface gerada que já tínhamos)
 - Rótulos com ponto no meio ("Lotes em risco · 5 dias", "Hoje · ao vivo"): escrever normal, "Lotes em risco (5 dias)".
 - Todos os blocos como cartões iguais com a mesma sombra.
-- Emoji em todo título: só nas abas (servem de navegação) e nos alertas.
+- Emoji em botão, aba ou título: usar ícones Material (`:material/nome:`), monocromáticos e do mesmo traço.
 - Palavras em CAIXA ALTA como rótulo; seta "→" em botão; texto de enfeite.
-- Animação em tudo: a única animação é a contagem dos números do topo.
+- Animação em tudo: só a contagem dos números do topo, o ponto "Ao vivo" pulsando e o retorno de clique (botão afunda 1 px). Respeitar "reduzir movimento".
 
 ## Textos
 - Falar como o dono fala: "Vai para o lixo", "A pagar", "Comprado a mais". Não "excedente", não "KPI".
@@ -57,3 +57,40 @@ Verde não é decoração: é marca e ação. Vermelho só significa problema. A
 |---|---|
 | Matheus | `docs/DESIGN.md`, etiquetas do topo (`ciclozero/ao_vivo.py`), aba Nota fiscal (`ciclozero/ui_nota.py`) |
 | João | tema e fontes (`.streamlit/config.toml`, CSS em `ciclozero/ui_agente.py`), Dashboard, chat, Pedidos, rótulos no `app.py` |
+
+## Sistema visual da landing page (referência para levar ao painel)
+Fonte da verdade: `landing/index.html` (bloco `:root` e comentários no CSS).
+
+**Paleta** (a mesma do app; os tons claros/escuros abaixo são derivados dela)
+| Token | Hex | Uso |
+|---|---|---|
+| tinta | `#1D2B22` | texto; fundo do bloco de confiança |
+| tinta-2 | `#4F5E54` | texto secundário |
+| folha | `#2F6B3B` | marca e ação (botão principal, item ativo) |
+| folha-escura | `#24552E` | hover de botão verde |
+| folha-clara | `#DCEADF` | fundo de "feito para", subtítulo sobre verde |
+| etiqueta | `#F6D23C` | olhe aqui: etiqueta, oferta, fechamento |
+| tomate | `#C8402B` | prejuízo e preço de oferta |
+| tomate-claro | `#F6DDD8` | fundo dos números de perda |
+| papel | `#EFE6D6` | nota, recibo, "como funciona" |
+| linha | `#D9DED6` | bordas |
+
+**Degradês** (só da paleta, nunca arco-íris)
+- Hero, só nela: verde escuro → claro na diagonal: `linear-gradient(115deg, #0F2E17 0%, #1A4424 22%, #2F6B3B 52%, #4C8E58 78%, #79B583 100%)`. Texto branco fica no lado escuro.
+- Papel: `linear-gradient(180deg, #EFE6D6, #F6F0E4)`.
+- Confiança: tinta `#1D2B22 → #18241C` com brilho verde no canto.
+- Fechamento: amarelo `#F6D23C → #FFE27A → #F6D23C`.
+- Etiqueta e botão amarelo: `#FFE066 → #F6D23C` (de cima para baixo) e sombra suave.
+
+**Tipografia leve**
+- Títulos: **Archivo** fino (h1 250, h2 300, h3 500), sem condensar, `letter-spacing` levemente negativo.
+- Texto: **Manrope** 300 (negrito = 600).
+- Números de destaque: Archivo 300–400; só o preço da etiqueta fica em 700, porque é a etiqueta.
+- No painel (Streamlit), a mesma troca vale para títulos e textos; os valores dos cartões podem ir para Archivo 600.
+
+**Detalhes disfarçados**
+- Desenhos de mercearia em traço fino (baguete, banana, leite, ovo, maçã, nota fiscal, cenoura, pão de forma) como padrão SVG, com 5% a 10% de opacidade e máscara que some para o lado do texto. Ficam no fundo de áreas grandes (hero, blocos de cor), nunca atrás de tabela ou número.
+- Sombras só em quem "flutua": etiqueta, botão principal e cartões de passo.
+
+**Plaquinha de oferta** (`ciclozero/mensagens.py`)
+- Fundo etiqueta, faixa superior tinta (o trilho da gôndola), selo "Oferta" em tomate, preço riscado em tinta-2 e preço novo grande em tomate.

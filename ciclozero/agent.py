@@ -378,7 +378,8 @@ class AgenteCicloZero:
             self.ao_passo(texto)
 
     def _sistema(self) -> str:
-        hoje = date.today()
+        from .relogio import hoje as _hoje_loja
+        hoje = _hoje_loja()
         return INSTRUCOES.format(hoje=hoje.strftime("%d/%m/%Y"), dia_semana=_DIAS[hoje.weekday()])
 
     def perguntar(self, mensagem: str) -> dict:

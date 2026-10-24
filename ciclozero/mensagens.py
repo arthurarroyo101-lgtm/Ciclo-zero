@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta
 from html import escape
 from urllib.parse import quote
 
-from . import tools
+from . import relogio, tools
 from .db import conectar
 
 
@@ -22,7 +22,7 @@ def _qtd(q: float) -> str:
 
 
 def _saudacao() -> str:
-    h = datetime.now().hour
+    h = relogio.hora().hour
     return "Bom dia" if h < 12 else "Boa tarde" if h < 18 else "Boa noite"
 
 
@@ -39,7 +39,7 @@ def mensagem_fornecedor(pedido: dict, loja: str = "") -> str:
     """Texto do pedido pronto para WhatsApp/e-mail."""
     itens = pedido.get("itens", [])
     linhas = [f"- {_qtd(i['quantidade'])} {i.get('unidade', '')} de {i['produto']}".replace("  ", " ") for i in itens]
-    entrega = date.today() + timedelta(days=max(1, _prazo([i["produto"] for i in itens])))
+    entrega = relogio.hoje() + timedelta(days=max(1, _prazo([i["produto"] for i in itens])))
     quem = f", aqui é da {loja}" if loja else ""
     return (f"{_saudacao()}, {pedido['fornecedor']}{quem}! Segue nosso pedido nº {pedido['id']}:\n"
             + "\n".join(linhas)
@@ -136,5 +136,5 @@ def render_plaquinhas() -> None:
     st.markdown(f"<style>{CSS_PLAQ}</style><div class='cz-plaqs'>"
                 + "".join(_html_plaquinha(p) for p in lista) + "</div>", unsafe_allow_html=True)
     st.download_button("Baixar plaquinhas para imprimir", pagina_impressao(lista),
-                       file_name=f"plaquinhas_{date.today().strftime('%d-%m')}.html", mime="text/html",
+                       file_name=f"plaquinhas_{relogio.hoje().strftime('%d-%m')}.html", mime="text/html",
                        icon=":material/print:")

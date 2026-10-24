@@ -306,7 +306,8 @@ def conciliar(dados: dict) -> list[dict]:
         por_id = {p["id"]: p for p in produtos}
         memoria = {r["descricao"]: (por_id.get(r["produto_id"]), r["vezes"])
                    for r in conn.execute("SELECT descricao, produto_id, vezes FROM apelidos")}
-    hoje = date.today()
+    from .relogio import hoje as _hoje_loja
+    hoje = _hoje_loja()
     linhas = []
     for item in dados.get("itens", []):
         desc = str(item.get("descricao") or "")
