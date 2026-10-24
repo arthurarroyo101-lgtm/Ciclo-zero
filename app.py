@@ -64,8 +64,12 @@ c3.metric("Perda projetada sem ação", reais(risco["resumo"]["perda_total_sem_a
 c4.metric("Perdas últimos 30 dias", reais(perdas["total_perdas_rs"]), perdas["perdas_sobre_faturamento"] + " do faturamento",
           delta_color="off")
 
-aba_chat, aba_dash, aba_painel, aba_pedidos, aba_log = st.tabs(
-    ["💬 Agente", "📊 Dashboard", "📦 Estoque", "🧾 Pedidos", "🔍 Rastreio"])
+aba_chat, aba_nota, aba_dash, aba_painel, aba_pedidos, aba_log = st.tabs(
+    ["💬 Agente", "📷 Nota fiscal", "📊 Dashboard", "📦 Estoque", "🧾 Pedidos", "🔍 Rastreio"])
+
+with aba_nota:  # módulo separado (Matheus) para não conflitar com o resto da interface
+    from ciclozero import ui_nota
+    ui_nota.render(lambda: get_agente(chave) if (tem_env or chave) else None)
 
 with aba_chat:
     if not (tem_env or chave):

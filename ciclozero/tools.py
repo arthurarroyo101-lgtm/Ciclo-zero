@@ -181,7 +181,8 @@ def registrar_entrada(produto: str, quantidade: float, validade: str) -> dict:
 
 
 def cadastrar_produto(nome: str, categoria: str, unidade: str, preco_custo: float, preco_venda: float,
-                      estoque_minimo: float, fornecedor: str, prazo_entrega_dias: int) -> dict:
+                      estoque_minimo: float, fornecedor: str, prazo_entrega_dias: int,
+                      validade_padrao_dias: int = 7) -> dict:
     """Cadastra um produto novo. Use SOMENTE com dados informados pelo usuário; se faltar algum, pergunte.
 
     Args:
@@ -193,6 +194,7 @@ def cadastrar_produto(nome: str, categoria: str, unidade: str, preco_custo: floa
         estoque_minimo: quantidade mínima que deve ter na loja.
         fornecedor: nome do fornecedor.
         prazo_entrega_dias: dias que o fornecedor leva para entregar.
+        validade_padrao_dias: quantos dias o produto costuma durar depois que chega (usado na leitura de nota fiscal).
     """
     unidade = (unidade or "").strip().lower()
     if unidade not in ("kg", "un"):
@@ -213,9 +215,10 @@ def cadastrar_produto(nome: str, categoria: str, unidade: str, preco_custo: floa
             original = next(n for n in existentes if _norm(n) == parecidos[0])
             return {"erro": f"Já existe '{original}', muito parecido. Confirme com o usuário se é outro produto."}
         conn.execute(
-            "INSERT INTO produtos (nome, categoria, unidade, preco_custo, preco_venda, estoque_minimo, fornecedor, prazo_entrega_dias)"
-            " VALUES (?,?,?,?,?,?,?,?)",
-            (nome.strip(), categoria, unidade, preco_custo, preco_venda, estoque_minimo, fornecedor, int(prazo_entrega_dias)))
+            "INSERT INTO produtos (nome, categoria, unidade, preco_custo, preco_venda, estoque_minimo, fornecedor, prazo_entrega_dias,"
+            " validade_padrao_dias) VALUES (?,?,?,?,?,?,?,?,?)",
+            (nome.strip(), categoria, unidade, preco_custo, preco_venda, estoque_minimo, fornecedor, int(prazo_entrega_dias),
+             int(validade_padrao_dias or 7)))
     aviso = "Atenção: preço de venda menor que o custo." if preco_venda < preco_custo else None
     r = {"ok": True, "produto": nome.strip(), "unidade": unidade, "margem": f"{(preco_venda / preco_custo - 1):.0%}"}
     if aviso:

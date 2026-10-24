@@ -64,12 +64,14 @@ Perguntas que a banca tende a fazer (seção 10 do edital): de onde vêm os fato
 
 ## Arquitetura (v1 — congelada em 24/10 00:27)
 ```
-app.py                  → interface Streamlit: Agente, Dashboard, Estoque, Pedidos, Rastreio
+app.py                  → interface Streamlit: Agente, Nota fiscal, Dashboard, Estoque, Pedidos, Rastreio
 ciclozero/db.py         → SQLite: produtos, lotes (validade), movimentações, pedidos, log_agente
 ciclozero/tools.py      → 10 ferramentas do agente (os números saem daqui, nunca do LLM)
 ciclozero/agent.py      → loop multi-provedor (Groq → Gemini) + function calling, guardrails, rastreio
 ciclozero/metricas.py   → observabilidade: latência média/p95, erros, uso de reserva
 ciclozero/graficos.py   → gráficos do dashboard (João)
+ciclozero/nota_fiscal.py → leitura multimodal da nota fiscal (visão) + verificação + conciliação
+ciclozero/ui_nota.py    → aba 📷 Nota fiscal
 ciclozero/seed.py       → padaria fictícia com 30 dias de histórico
 tests/eval_agente.py    → avaliação automática (12 casos) → docs/AVALIACAO.md
 docs/                   → DECISOES, TAREFAS, FLUXO_AGENTE, DEMO, AVALIACAO
@@ -77,6 +79,8 @@ docs/                   → DECISOES, TAREFAS, FLUXO_AGENTE, DEMO, AVALIACAO
 Decisões de projeto: cálculos em Python (não no LLM) para evitar número inventado; FEFO na baixa de estoque; pedido de compra sempre como rascunho com aprovação humana; pedido > 2× o sugerido é bloqueado e reposição desconta pedidos em aberto; desconto máximo 50%; travas contra "contornar" recusas e contra confundir chegada com saída; máximo 8 passos por pergunta; troca automática de modelo/provedor.
 
 ## Log
+- **2026-10-24 01:45** — **Entrada multimodal por foto da nota fiscal** (aba 📷): visão (Gemini → reserva Groq/Llama 4) extrai itens em JSON; verificação automática (soma dos itens × total da nota; qtd × unitário); conciliação com o cadastro (sinônimos, validade padrão por produto — novo campo `validade_padrao_dias` com migração automática); tabela editável; nada entra sem confirmação; item desconhecido não é lançado; depois de lançar, o agente avalia na hora se a compra vai sobrar. Motivação: (1) edital pede agentes de ponta a ponta com mínimo de intervenção humana e valoriza interfaces multimodais; (2) **validação do Arthur** mostrou que a dor real relatada é o trabalho manual de anotar estoque. Nota de exemplo fictícia em `docs/exemplos/`. Teste offline `tests/test_nota_fiscal.py` (6/6). Interface em módulo separado (`ciclozero/ui_nota.py`) para não conflitar com o João. Roteiro da demo atualizado.
+- **2026-10-24 01:35** — **PR #2 do João aceito** (agente não inventa parâmetro de ferramenta; remove marcas 【…】; C12 mais rígido). **Arthur subiu `docs/validacao.md`**: 2 entrevistas (Canto Caseiro: dor = controle manual de estoque, pagaria se acessível; Subway: sem dor). Conclusão: a dor validada é **controle de estoque/trabalho manual**, não desperdício em si → pitch deve liderar com isso.
 - **2026-10-24 00:55** — **PR #1 do João aceito** (reposição explicável): no teste manual ele viu o agente explicar a compra de leite com média/prazo inventados (a ferramenta não devolvia esses dados ao modelo). Agora `calcular_reposicao` devolve `prazo_entrega_dias` e um campo `conta` com o cálculo completo em pt-BR; quantidade arredondada para cima; regra no prompt para copiar a conta; novo caso **C12** (fidelidade da explicação). Ajuste na revisão: f-string com aspas aninhadas só roda em Python ≥ 3.12 → reescrita para funcionar em 3.10+. Fluxo de PR para arquivos de outro dono funcionou bem — manter.
 - **2026-10-24 00:35** — Roteiro da demo em `docs/DEMO.md` (≈75 s: Dashboard → entrada por linguagem natural → rotina autônoma → aprovação humana → Rastreio), checklist, plano B, como gravar o vídeo de backup e respostas para perguntas técnicas da banca.
 - **2026-10-24 00:27** — ✅ **Avaliação final v5: 11/11 casos, fidelidade 100%, latência média 14 s** (rotina 47 s nesta rodada por limite por minuto do Groq; sozinha ~25–28 s). **Agente congelado** — a partir daqui só correções críticas.

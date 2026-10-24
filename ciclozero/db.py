@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS produtos (
     preco_venda REAL DEFAULT 0,
     estoque_minimo REAL DEFAULT 0,
     fornecedor TEXT,
-    prazo_entrega_dias INTEGER DEFAULT 2
+    prazo_entrega_dias INTEGER DEFAULT 2,
+    validade_padrao_dias INTEGER DEFAULT 7
 );
 CREATE TABLE IF NOT EXISTS lotes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,3 +72,7 @@ def conectar() -> sqlite3.Connection:
 def criar_tabelas() -> None:
     with conectar() as conn:
         conn.executescript(SCHEMA)
+        # migração: bancos criados antes da leitura de nota fiscal não têm a validade padrão
+        colunas = {r["name"] for r in conn.execute("PRAGMA table_info(produtos)")}
+        if "validade_padrao_dias" not in colunas:
+            conn.execute("ALTER TABLE produtos ADD COLUMN validade_padrao_dias INTEGER DEFAULT 7")

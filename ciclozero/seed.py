@@ -36,8 +36,8 @@ def popular(seed: int = 42) -> None:
     with conectar() as conn:
         for nome, cat, un, custo, venda, minimo, forn, prazo, vpd, val in PRODUTOS:
             pid = conn.execute(
-                "INSERT INTO produtos (nome, categoria, unidade, preco_custo, preco_venda, estoque_minimo, fornecedor, prazo_entrega_dias)"
-                " VALUES (?,?,?,?,?,?,?,?)", (nome, cat, un, custo, venda, minimo, forn, prazo)).lastrowid
+                "INSERT INTO produtos (nome, categoria, unidade, preco_custo, preco_venda, estoque_minimo, fornecedor, prazo_entrega_dias,"
+                " validade_padrao_dias) VALUES (?,?,?,?,?,?,?,?,?)", (nome, cat, un, custo, venda, minimo, forn, prazo, val)).lastrowid
             # 30 dias de histórico: vendas diárias com ruído + perdas ocasionais de perecíveis
             for d in range(30, 0, -1):
                 dia = (hoje - timedelta(days=d)).isoformat()

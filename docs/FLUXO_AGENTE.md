@@ -19,9 +19,25 @@
 ## Entradas
 | Entrada | Exemplo |
 |---|---|
+| **Foto da nota fiscal** (multimodal) | Foto/print da nota do fornecedor → visão computacional extrai os itens → lotes entram no estoque após conferência |
 | Mensagem do usuário | "Vendi 5 kg de pão", "o que vai vencer essa semana?", "faz o pedido da Ceasa" |
 | Rotina diária (modo autônomo) | Botão "Rodar rotina diária" — o agente checa tudo sozinho, sem pergunta |
 | Base de dados | Produtos, lotes com validade, 30 dias de vendas e perdas, fornecedores e prazos de entrega |
+
+## Entrada multimodal: foto da nota fiscal
+A dor mais citada na validação foi o **trabalho manual de anotar o que chega** ("no olhômetro", horas por dia). Por isso a entrada de mercadoria pode ser feita por **foto da nota**:
+
+```
+foto da nota ──► modelo de visão (Gemini; reserva: Groq/Llama 4) ──► JSON: fornecedor, nº, total, itens
+            ──► verificação: soma dos itens = total da nota? quantidade × unitário = total do item?
+            ──► conciliação: cada item ↔ produto do cadastro (+ validade padrão do produto, aviso de custo diferente)
+            ──► tabela editável: o dono confere e confirma  (nada entra sem confirmação)
+            ──► lotes lançados pelas MESMAS ferramentas do agente (mesmas validações)
+            ──► o agente avalia na hora se a compra vai gerar sobra (ex.: 40 kg de banana para 8 kg/dia de venda)
+```
+- **Qualidade da leitura medida sem gabarito:** se a soma dos itens bate com o total impresso, a leitura é marcada como verificada; se não, a tela pede atenção.
+- **Item desconhecido** (ex.: manteiga não cadastrada) não é lançado; o dono cadastra pelo chat.
+- Código: `ciclozero/nota_fiscal.py` · tela: `ciclozero/ui_nota.py` · teste offline: `python -m tests.test_nota_fiscal`.
 
 ## Ferramentas (o que o agente sabe fazer)
 | Ferramenta | O que faz |

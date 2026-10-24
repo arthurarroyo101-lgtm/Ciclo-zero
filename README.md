@@ -17,6 +17,9 @@ cp .env.example .env   # e coloque sua GEMINI_API_KEY
 streamlit run app.py
 ```
 Na primeira execução o app cria um banco com dados de exemplo (padaria fictícia). Para testar só no terminal: `python -m ciclozero.agent`.
+Testes: `python -m tests.eval_agente` (agente, precisa de chave) e `python -m tests.test_nota_fiscal` (nota fiscal, offline).
+
+**Entrada por foto da nota fiscal:** aba 📷 Nota fiscal — há uma nota fictícia de exemplo em `docs/exemplos/`.
 
 ## Documentação
 - [Diário de decisões](docs/DECISOES.md)
