@@ -170,12 +170,14 @@ def render_plano(passos: list[dict]) -> None:
 
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75,800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap');
 
 :root {
-    --cz-folha: #2F6B3A;
+    --cz-folha: #2F6B3B;
     --cz-folha-escura: #1F4D29;
-    --cz-tinta: #1F2A22;
+    --cz-tinta: #1D2B22;
+    --cz-risco: #C8402B;
+    --cz-etiqueta: #F6D23C;
     --cz-sub: #5F6B62;
     --cz-salvia: #EEF3EC;
     --cz-fio: #D6DED3;
@@ -190,7 +192,32 @@ label, button, input, textarea, [data-testid="stMetricValue"], [data-testid="stM
 }
 .stApp { color: var(--cz-tinta); }
 h1, h2, h3, h4 { color: var(--cz-tinta); letter-spacing: -0.01em; }
-[data-testid="stMetricValue"] { font-variant-numeric: tabular-nums; font-weight: 700; }
+/* números dos indicadores: Archivo 800 condensada (lê de longe, cabe mais dígito) */
+[data-testid="stMetricValue"], [data-testid="stMetricValue"] div {
+    font-family: "Archivo", "Arial Narrow", sans-serif !important;
+    font-weight: 800 !important; font-stretch: 75%; font-variation-settings: "wdth" 75;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+}
+/* valores negativos e de risco: marcados no app.py com <span class="cz-neg"> na mesma coluna */
+[data-testid="stColumn"]:has(.cz-neg) [data-testid="stMetricValue"],
+[data-testid="column"]:has(.cz-neg) [data-testid="stMetricValue"] { color: var(--cz-risco) !important; }
+.cz-neg { display: none; }
+
+/* alertas de compra em excesso (st.warning): amarelo de etiqueta de oferta */
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentWarning"]),
+div[data-baseweb="notification"]:has([data-testid="stAlertContentWarning"]) {
+    background: var(--cz-etiqueta) !important; color: var(--cz-tinta) !important;
+}
+[data-testid="stAlertContentWarning"], [data-testid="stAlertContentWarning"] p { color: var(--cz-tinta) !important; }
+
+/* botões primários em verde folha (o tema já define; reforço para versões antigas) */
+button[kind="primary"], [data-testid="stBaseButton-primary"] {
+    background: var(--cz-folha) !important; border-color: var(--cz-folha) !important; color: #FFFFFF !important;
+}
+button[kind="primary"]:hover, [data-testid="stBaseButton-primary"]:hover { background: var(--cz-folha-escura) !important; }
+
+/* sem sombras decorativas */
+[data-testid="stVerticalBlockBorderWrapper"] { box-shadow: none !important; }
 
 /* barra lateral em sálvia */
 [data-testid="stSidebar"] { background: var(--cz-salvia); border-right: 1px solid var(--cz-fio); }
