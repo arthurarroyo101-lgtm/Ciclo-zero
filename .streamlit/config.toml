@@ -1,4 +1,5 @@
 [theme]
+base = "light"  # tema claro fixo: mais legível no projetor e combina com os cartões ao vivo
 # verde do Ciclo Zero; o resto acompanha o tema claro/escuro do navegador
 primaryColor = "#2E7D32"
 

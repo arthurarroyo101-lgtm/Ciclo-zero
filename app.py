@@ -115,98 +115,135 @@ with aba_chat:
             st.rerun()
 
 with aba_dash:
-    from ciclozero import graficos
+    @st.fragment(run_every=ao_vivo.intervalo())  # ao vivo: atualiza sozinho
+    def _aba_dash():
+        risco = tools.analisar_risco_desperdicio()
+        perdas = tools.relatorio_desperdicio(30)
+        fin = ao_vivo.financeiro_do_dia()
+        with st.container(border=True):
+            st.markdown("#### 💰 Resultado de hoje" + ("  ·  🟢 ao vivo" if ao_vivo.simulador().ativo else ""))
+            f1, f2, f3, f4, f5, f6 = st.columns(6)
+            f1.metric("Vendas", reais(fin["vendas_rs"]), f"{fin['n_vendas']} vendas", delta_color="off")
+            f2.metric("Custo do que vendeu", reais(fin["custo_vendas_rs"]))
+            f3.metric("Lucro bruto", reais(fin["lucro_bruto_rs"]), f"margem {fin['margem']:.0%}".replace(".", ","),
+                      delta_color="off")
+            f4.metric("Compras recebidas", reais(fin["compras_rs"]))
+            f5.metric("Perdas hoje", reais(fin["perdas_rs"]))
+            f6.metric("Pedidos p/ aprovar", fin["pedidos_pendentes"], reais(fin["pedidos_pendentes_rs"]),
+                      delta_color="off")
+            st.caption("Lucro bruto = vendas − custo do que foi vendido − perdas. Ticket médio: " + reais(fin["ticket_medio_rs"]))
+            mov = ao_vivo.tabela_movimento()
+            if not mov.empty:
+                st.markdown("##### Últimos lançamentos")
+                st.dataframe(mov, width="stretch", hide_index=True, height=250)
+        from ciclozero import graficos
 
-    hist = tools.historico_diario(30)
-    df_lotes = graficos.dados_lotes_em_risco(risco)
-    df_top = graficos.dados_top_desperdicio(perdas, 5)
-    df_cat = graficos.dados_perdas_por_categoria(hist)
-    df_dia = graficos.dados_vendas_x_perdas(hist)
+        hist = tools.historico_diario(30)
+        df_lotes = graficos.dados_lotes_em_risco(risco)
+        df_top = graficos.dados_top_desperdicio(perdas, 5)
+        df_cat = graficos.dados_perdas_por_categoria(hist)
+        df_dia = graficos.dados_vendas_x_perdas(hist)
 
-    st.caption("Todos os números saem do banco, pelas mesmas ferramentas que o agente usa. "
-               "Perdas e risco são medidos pelo custo do produto.")
+        st.caption("Todos os números saem do banco, pelas mesmas ferramentas que o agente usa. "
+                   "Perdas e risco são medidos pelo custo do produto.")
 
-    col_a, col_b = st.columns(2)
-    with col_a, st.container(border=True):
-        st.markdown("#### ⏳ O que precisa de ação agora")
-        if df_lotes.empty:
-            st.success("Nenhum lote vence nos próximos 5 dias com sobra prevista.")
-        else:
-            st.caption(f"{len(df_lotes)} lote(s) vencem em até 5 dias e não devem ser vendidos a tempo. "
-                       f"Sem ação, a perda seria de **{graficos.reais(df_lotes['perda'].sum())}**.")
-            st.altair_chart(graficos.grafico_lotes_em_risco(df_lotes), width="stretch")
-    with col_b, st.container(border=True):
-        st.markdown("#### 🏆 Top 5 produtos que mais geram desperdício")
-        if df_top.empty:
-            st.info("Sem perdas registradas nos últimos 30 dias.")
-        else:
-            lider = df_top.iloc[0]
-            st.caption(f"**{lider['produto']}** sozinho responde por {lider['parcela']} "
-                       f"({lider['valor_fmt']} em 30 dias).")
-            st.altair_chart(graficos.grafico_top_desperdicio(df_top), width="stretch")
+        col_a, col_b = st.columns(2)
+        with col_a, st.container(border=True):
+            st.markdown("#### ⏳ O que precisa de ação agora")
+            if df_lotes.empty:
+                st.success("Nenhum lote vence nos próximos 5 dias com sobra prevista.")
+            else:
+                st.caption(f"{len(df_lotes)} lote(s) vencem em até 5 dias e não devem ser vendidos a tempo. "
+                           f"Sem ação, a perda seria de **{graficos.reais(df_lotes['perda'].sum())}**.")
+                st.altair_chart(graficos.grafico_lotes_em_risco(df_lotes), width="stretch")
+        with col_b, st.container(border=True):
+            st.markdown("#### 🏆 Top 5 produtos que mais geram desperdício")
+            if df_top.empty:
+                st.info("Sem perdas registradas nos últimos 30 dias.")
+            else:
+                lider = df_top.iloc[0]
+                st.caption(f"**{lider['produto']}** sozinho responde por {lider['parcela']} "
+                           f"({lider['valor_fmt']} em 30 dias).")
+                st.altair_chart(graficos.grafico_top_desperdicio(df_top), width="stretch")
 
-    with st.container(border=True):
-        st.markdown("#### 📈 Vendas × perdas por dia (últimos 30 dias)")
-        if df_dia.empty:
-            st.info("Sem movimentações no período.")
-        else:
-            st.caption(f"Faturamento de {graficos.reais(perdas['faturamento_rs'])} e perdas de "
-                       f"{graficos.reais(perdas['total_perdas_rs'])} ({perdas['perdas_sobre_faturamento']} do "
-                       "faturamento). Cada eixo tem sua escala para as perdas não sumirem no gráfico.")
-            st.altair_chart(graficos.grafico_vendas_x_perdas(df_dia), width="stretch")
+        with st.container(border=True):
+            st.markdown("#### 📈 Vendas × perdas por dia (últimos 30 dias)")
+            if df_dia.empty:
+                st.info("Sem movimentações no período.")
+            else:
+                st.caption(f"Faturamento de {graficos.reais(perdas['faturamento_rs'])} e perdas de "
+                           f"{graficos.reais(perdas['total_perdas_rs'])} ({perdas['perdas_sobre_faturamento']} do "
+                           "faturamento). Cada eixo tem sua escala para as perdas não sumirem no gráfico.")
+                st.altair_chart(graficos.grafico_vendas_x_perdas(df_dia), width="stretch")
 
-    with st.container(border=True):
-        st.markdown("#### 🗂️ Perdas por categoria")
-        if df_cat.empty:
-            st.info("Sem perdas registradas nos últimos 30 dias.")
-        else:
-            st.caption(f"**{df_cat.iloc[0]['categoria']}** é a categoria que mais perde "
-                       f"({df_cat.iloc[0]['valor_fmt']} em 30 dias).")
-            st.altair_chart(graficos.grafico_perdas_por_categoria(df_cat), width="stretch")
+        with st.container(border=True):
+            st.markdown("#### 🗂️ Perdas por categoria")
+            if df_cat.empty:
+                st.info("Sem perdas registradas nos últimos 30 dias.")
+            else:
+                st.caption(f"**{df_cat.iloc[0]['categoria']}** é a categoria que mais perde "
+                           f"({df_cat.iloc[0]['valor_fmt']} em 30 dias).")
+                st.altair_chart(graficos.grafico_perdas_por_categoria(df_cat), width="stretch")
+    _aba_dash()
 
 with aba_painel:
-    st.subheader("Lotes em risco de desperdício")
-    if risco["lotes_em_risco"]:
-        st.dataframe(tabela(risco["lotes_em_risco"]), width="stretch", hide_index=True)
-    st.subheader("Estoque atual")
-    st.dataframe(tabela(tools.consultar_estoque()["itens"]), width="stretch", hide_index=True)
+    @st.fragment(run_every=ao_vivo.intervalo())  # ao vivo: atualiza sozinho
+    def _aba_estoque():
+        risco = tools.analisar_risco_desperdicio()
+        perdas = tools.relatorio_desperdicio(30)
+        st.subheader("Lotes em risco de desperdício")
+        if risco["lotes_em_risco"]:
+            st.dataframe(tabela(risco["lotes_em_risco"]), width="stretch", hide_index=True)
+        st.subheader("Estoque atual")
+        st.dataframe(tabela(tools.consultar_estoque()["itens"]), width="stretch", hide_index=True)
+    _aba_estoque()
 
 with aba_pedidos:
-    pedidos = tools.listar_pedidos()
-    if not pedidos:
-        st.info("Nenhum pedido ainda. Rode a rotina diária ou peça ao agente para calcular a reposição.")
-    for p in pedidos:
-        with st.container(border=True):
-            st.markdown(f"**Pedido #{p['id']} — {p['fornecedor']}** · {reais(p['valor_estimado'])} · `{p['status']}`")
-            st.caption(p["justificativa"] or "")
-            st.dataframe(pd.DataFrame(p["itens"]), hide_index=True)
-            if p["status"] == "rascunho":
-                a, b = st.columns(2)
-                if a.button("✅ Aprovar", key=f"ok{p['id']}"):
-                    tools.decidir_pedido(p["id"], True)
-                    st.rerun()
-                if b.button("❌ Recusar", key=f"no{p['id']}"):
-                    tools.decidir_pedido(p["id"], False)
-                    st.rerun()
+    @st.fragment(run_every=ao_vivo.intervalo())  # ao vivo: atualiza sozinho
+    def _aba_pedidos():
+        risco = tools.analisar_risco_desperdicio()
+        perdas = tools.relatorio_desperdicio(30)
+        pedidos = tools.listar_pedidos()
+        if not pedidos:
+            st.info("Nenhum pedido ainda. Rode a rotina diária ou peça ao agente para calcular a reposição.")
+        for p in pedidos:
+            with st.container(border=True):
+                st.markdown(f"**Pedido #{p['id']} — {p['fornecedor']}** · {reais(p['valor_estimado'])} · `{p['status']}`")
+                st.caption(p["justificativa"] or "")
+                st.dataframe(pd.DataFrame(p["itens"]), hide_index=True)
+                if p["status"] == "rascunho":
+                    a, b = st.columns(2)
+                    if a.button("✅ Aprovar", key=f"ok{p['id']}"):
+                        tools.decidir_pedido(p["id"], True)
+                        st.rerun()
+                    if b.button("❌ Recusar", key=f"no{p['id']}"):
+                        tools.decidir_pedido(p["id"], False)
+                        st.rerun()
+    _aba_pedidos()
 
 with aba_log:
-    from ciclozero.metricas import metricas_agente
-    m = metricas_agente()
-    st.subheader("Saúde do agente")
-    st.caption("Sinais de degradação: latência p95 subindo, mais erros do modelo, mais trocas para o modelo reserva "
-               "ou mais erros de ferramenta (modelo chamando com argumentos ruins).")
-    k1, k2, k3, k4, k5 = st.columns(5)
-    k1.metric("Perguntas", m["perguntas"])
-    k2.metric("Tempo médio", f"{m['latencia_media_pergunta_s']:.1f} s".replace(".", ","))
-    k3.metric("Tempo p95", f"{m['latencia_p95_pergunta_s']:.1f} s".replace(".", ","))
-    k4.metric("Erro do modelo", m["taxa_erro_llm"])
-    k5.metric("Usou reserva", m["trocas_para_reserva"])
-    st.caption(f"{m['chamadas_ferramenta']} chamadas de ferramenta · {m['erros_de_ferramenta']} devolveram erro "
-               f"(e o agente se corrigiu ou perguntou) · {m['perguntas_com_erro']} perguntas sem resposta")
-    if m["por_modelo"]:
-        st.dataframe(pd.DataFrame(m["por_modelo"]), width="stretch", hide_index=True)
-    st.subheader("Registro passo a passo")
-    st.caption("Cada passo do agente fica registrado: o que recebeu, quais ferramentas chamou e o que respondeu.")
-    with conectar() as conn:
-        log = pd.read_sql("SELECT sessao, passo, tipo, conteudo, criado_em FROM log_agente ORDER BY id DESC LIMIT 200", conn)
-    st.dataframe(log, width="stretch", hide_index=True)
+    @st.fragment(run_every=ao_vivo.intervalo())  # ao vivo: atualiza sozinho
+    def _aba_rastreio():
+        risco = tools.analisar_risco_desperdicio()
+        perdas = tools.relatorio_desperdicio(30)
+        from ciclozero.metricas import metricas_agente
+        m = metricas_agente()
+        st.subheader("Saúde do agente")
+        st.caption("Sinais de degradação: latência p95 subindo, mais erros do modelo, mais trocas para o modelo reserva "
+                   "ou mais erros de ferramenta (modelo chamando com argumentos ruins).")
+        k1, k2, k3, k4, k5 = st.columns(5)
+        k1.metric("Perguntas", m["perguntas"])
+        k2.metric("Tempo médio", f"{m['latencia_media_pergunta_s']:.1f} s".replace(".", ","))
+        k3.metric("Tempo p95", f"{m['latencia_p95_pergunta_s']:.1f} s".replace(".", ","))
+        k4.metric("Erro do modelo", m["taxa_erro_llm"])
+        k5.metric("Usou reserva", m["trocas_para_reserva"])
+        st.caption(f"{m['chamadas_ferramenta']} chamadas de ferramenta · {m['erros_de_ferramenta']} devolveram erro "
+                   f"(e o agente se corrigiu ou perguntou) · {m['perguntas_com_erro']} perguntas sem resposta")
+        if m["por_modelo"]:
+            st.dataframe(pd.DataFrame(m["por_modelo"]), width="stretch", hide_index=True)
+        st.subheader("Registro passo a passo")
+        st.caption("Cada passo do agente fica registrado: o que recebeu, quais ferramentas chamou e o que respondeu.")
+        with conectar() as conn:
+            log = pd.read_sql("SELECT sessao, passo, tipo, conteudo, criado_em FROM log_agente ORDER BY id DESC LIMIT 200", conn)
+        st.dataframe(log, width="stretch", hide_index=True)
+    _aba_rastreio()

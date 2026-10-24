@@ -22,14 +22,18 @@ from .db import conectar
 
 INTERVALO_S = 4.0          # uma "passada no caixa" a cada ~4 s
 MOTIVO = "simulação ao vivo"
+# a reposição automática só começa depois de alguns minutos ligada, para não "roubar" da rotina diária
+# os pedidos que ela cria na demo (o roteiro roda a rotina ~1 min depois de ligar a loja ao vivo)
+PEDIDOS_AUTOMATICOS_APOS_S = 180
 
 
 class Simulador:
     def __init__(self):
         self._thread: threading.Thread | None = None
         self._parar = threading.Event()
-        self.eventos: deque = deque(maxlen=8)   # últimas vendas, para o letreiro
+        self.eventos: deque = deque(maxlen=12)   # últimas vendas, para o letreiro
         self.vendas_sessao = 0
+        self.ligado_em = 0.0
 
     @property
     def ativo(self) -> bool:
@@ -39,6 +43,7 @@ class Simulador:
         if self.ativo:
             return
         self._parar.clear()
+        self.ligado_em = time.time()
         self._thread = threading.Thread(target=self._laco, daemon=True, name="ciclozero-ao-vivo")
         self._thread.start()
 
@@ -58,20 +63,38 @@ class Simulador:
     def passo(self) -> list[dict]:
         """Um momento da loja: quase sempre um cliente no caixa; às vezes chega mercadoria ou algo estraga."""
         sorteio = random.random()
-        if sorteio < 0.12:
+        if sorteio < 0.05 and time.time() - self.ligado_em > PEDIDOS_AUTOMATICOS_APOS_S:
+            ev = self._solicitar_reposicao()
+        elif sorteio < 0.16:
             ev = self._chegada()
-        elif sorteio < 0.20:
+        elif sorteio < 0.23:
             ev = self._perda()
         else:
             return self._venda()
         return [ev] if ev else self._venda()
 
-    def _registrar(self, tipo: str, nome: str, qtd: float, unidade: str) -> dict:
+    def _solicitar_reposicao(self) -> dict | None:
+        """Reposição automática: se algo está acabando, gera rascunho de pedido (o dono aprova na aba Pedidos)."""
+        r = tools.criar_pedidos_sugeridos()
+        if not r.get("pedidos_criados"):
+            return None
+        forn = ", ".join(p["fornecedor"] for p in r["pedidos"] if p.get("ok"))
+        ev = self._registrar("pedido", forn, r["pedidos_criados"], "pedido(s)")
+        ev["valor"] = r["valor_total_rs"]
+        return ev
+
+    def _registrar(self, tipo: str, nome: str, qtd: float, unidade: str, valor: float = 0.0) -> dict:
         ev = {"hora": datetime.now().strftime("%H:%M:%S"), "tipo": tipo, "produto": nome,
-              "quantidade": qtd, "unidade": unidade}
+              "quantidade": qtd, "unidade": unidade, "valor": round(valor, 2)}
         self.eventos.appendleft(ev)
         self.vendas_sessao += tipo == "venda"
         return ev
+
+    @staticmethod
+    def _preco(nome: str) -> tuple[float, float]:
+        with conectar() as conn:
+            r = conn.execute("SELECT preco_custo, preco_venda FROM produtos WHERE nome=?", (nome,)).fetchone()
+        return (r["preco_custo"], r["preco_venda"]) if r else (0.0, 0.0)
 
     def _venda(self) -> list[dict]:
         """Cliente no caixa: 1 a 3 produtos, escolhidos pelo quanto cada um costuma vender."""
@@ -85,7 +108,7 @@ class Simulador:
             qtd = round(random.uniform(0.2, 1.5), 1) if item["unidade"] == "kg" else float(random.randint(1, 3))
             qtd = min(qtd, item["saldo"])
             if qtd > 0 and tools.registrar_saida(nome, qtd, "venda", MOTIVO).get("ok"):
-                vendidos.append(self._registrar("venda", nome, qtd, item["unidade"]))
+                vendidos.append(self._registrar("venda", nome, qtd, item["unidade"], qtd * self._preco(nome)[1]))
         return vendidos
 
     def _chegada(self) -> dict | None:
@@ -101,7 +124,7 @@ class Simulador:
         qtd = max(1.0, round(item["media_vendas_dia"] * random.uniform(2, 4), 1 if item["unidade"] == "kg" else 0))
         validade = (date.today() + timedelta(days=int(dias))).strftime("%d/%m/%Y")
         if tools.registrar_entrada(item["produto"], qtd, validade).get("ok"):
-            return self._registrar("chegada", item["produto"], qtd, item["unidade"])
+            return self._registrar("chegada", item["produto"], qtd, item["unidade"], qtd * self._preco(item["produto"])[0])
         return None
 
     def _perda(self) -> dict | None:
@@ -113,7 +136,7 @@ class Simulador:
         item = random.choice(candidatos)
         qtd = min(item["saldo"], round(random.uniform(0.3, 1.2), 1) if item["unidade"] == "kg" else 1.0)
         if tools.registrar_saida(item["produto"], qtd, "perda", "estragou (" + MOTIVO + ")").get("ok"):
-            return self._registrar("perda", item["produto"], qtd, item["unidade"])
+            return self._registrar("perda", item["produto"], qtd, item["unidade"], qtd * self._preco(item["produto"])[0])
         return None
 
 
@@ -130,6 +153,30 @@ def vendas_de_hoje() -> dict:
         r = conn.execute("SELECT COUNT(*) n, COALESCE(SUM(valor),0) v, COALESCE(SUM(quantidade),0) q "
                          "FROM movimentacoes WHERE tipo='venda' AND data=?", (hoje,)).fetchone()
     return {"vendas": r["n"], "faturamento_rs": round(r["v"], 2), "itens": round(r["q"], 1)}
+
+
+def financeiro_do_dia() -> dict:
+    """Resultado do dia a partir das movimentações: vendas, custo do que foi vendido, lucro, compras e perdas."""
+    hoje = date.today().isoformat()
+    with conectar() as conn:
+        r = conn.execute(
+            """SELECT
+                 COALESCE(SUM(CASE WHEN m.tipo='venda' THEN m.valor END),0)                       AS vendas,
+                 COALESCE(SUM(CASE WHEN m.tipo='venda' THEN m.quantidade*p.preco_custo END),0)    AS custo_vendas,
+                 COALESCE(SUM(CASE WHEN m.tipo='entrada' THEN m.valor END),0)                     AS compras,
+                 COALESCE(SUM(CASE WHEN m.tipo='perda' THEN m.valor END),0)                       AS perdas,
+                 COALESCE(SUM(CASE WHEN m.tipo='doacao' THEN m.valor END),0)                      AS doacoes,
+                 COUNT(CASE WHEN m.tipo='venda' THEN 1 END)                                        AS n_vendas
+               FROM movimentacoes m JOIN produtos p ON p.id=m.produto_id WHERE m.data=?""", (hoje,)).fetchone()
+        pend = conn.execute("SELECT COUNT(*) n, COALESCE(SUM(valor_estimado),0) v FROM pedidos WHERE status='rascunho'"
+                            ).fetchone()
+    vendas, custo = r["vendas"], r["custo_vendas"]
+    lucro = vendas - custo - r["perdas"]
+    return {"vendas_rs": round(vendas, 2), "custo_vendas_rs": round(custo, 2), "lucro_bruto_rs": round(lucro, 2),
+            "margem": (lucro / vendas) if vendas else 0.0, "compras_rs": round(r["compras"], 2),
+            "perdas_rs": round(r["perdas"], 2), "n_vendas": r["n_vendas"],
+            "ticket_medio_rs": round(vendas / r["n_vendas"], 2) if r["n_vendas"] else 0.0,
+            "pedidos_pendentes": pend["n"], "pedidos_pendentes_rs": round(pend["v"], 2)}
 
 
 # ------------------------------------------------------------------ interface
@@ -199,12 +246,24 @@ def _cartoes(cartoes: list[dict]) -> None:
 
     import streamlit.components.v1 as components
     import streamlit as st
-    try:  # segue o tema escolhido no Streamlit (claro/escuro); se não der para saber, segue o navegador
-        tema = st.context.theme.type or "light"
-    except Exception:
-        tema = "light"
+    tema = "light"  # o app usa tema claro fixo (.streamlit/config.toml) — melhor no projetor
     html = _CARTOES_HTML.replace("__DADOS__", _json.dumps(cartoes, ensure_ascii=False)).replace("__TEMA__", tema)
     components.html(html, height=118)
+
+
+def intervalo() -> int | None:
+    """Intervalo de atualização das abas de dados: 4 s com a loja ao vivo ligada; parado se desligada."""
+    return 4 if simulador().ativo else None
+
+
+def tabela_movimento():
+    """Últimos lançamentos da simulação (para a aba Dashboard)."""
+    import pandas as pd
+    nomes = {"venda": "🛒 Venda", "chegada": "🚚 Chegada", "perda": "🗑️ Perda", "pedido": "📝 Pedido automático"}
+    linhas = [{"hora": e["hora"], "lançamento": nomes.get(e.get("tipo"), e.get("tipo")), "item": e["produto"],
+               "qtd": f"{e['quantidade']:g} {e['unidade']}", "valor": _reais(e.get("valor", 0))}
+              for e in simulador().eventos]
+    return pd.DataFrame(linhas)
 
 
 def controles() -> None:
@@ -251,10 +310,10 @@ def painel() -> None:
              "para": perdas["total_perdas_rs"], "nota": perdas["perdas_sobre_faturamento"].replace(".", ",") + " do faturamento"},
         ])
         if sim.ativo and sim.eventos:
-            icone = {"venda": "🛒", "chegada": "🚚", "perda": "🗑️"}
+            icone = {"venda": "🛒", "chegada": "🚚", "perda": "🗑️", "pedido": "📝"}
             st.caption("Movimento: " + " · ".join(
                 f"{icone.get(e.get('tipo'), '🛒')} {e['hora']} {e['quantidade']:g} {e['unidade']} {e['produto']}"
-                for e in list(sim.eventos)[:5]) + "  ·  🛒 venda  🚚 chegada  🗑️ estragou")
+                for e in list(sim.eventos)[:5]) + "  ·  🛒 venda  🚚 chegada  🗑️ estragou  📝 pedido automático")
         st.session_state["_painel_anterior"] = atual
 
     _painel()

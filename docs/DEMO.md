@@ -10,7 +10,7 @@
 - [ ] `streamlit run app.py` rodando, navegador em tela cheia (⌃⌘F), zoom 125% (⌘+)
 - [ ] Barra lateral → **🔄 Recriar dados de exemplo** (deixa os números iguais aos do roteiro e zera pedidos)
 - [ ] Abrir a aba **📊 Dashboard**
-- [ ] **Loja ao vivo DESLIGADA** até começar a demo (liga no primeiro passo)
+- [ ] **Loja ao vivo DESLIGADA** até começar a demo (liga no primeiro passo; pedidos automáticos só começam 3 min depois de ligar)
 - [ ] Vídeo de backup aberto em outra janela (plano B)
 - [ ] Notificações do Mac desligadas (Foco → Não perturbe)
 
@@ -36,6 +36,7 @@
 | Groq fora do ar | Nada — o agente troca sozinho para o Gemini (aparece 🔁). Falar: "olha a resiliência: trocou de provedor sozinho." |
 | Rotina demorando > 40 s | Continuar falando o fluxo; se passar de 60 s, ir para o vídeo |
 | Sem internet / tudo falhou | **Vídeo de backup** (o edital aceita demo gravada) |
+| Rotina diária não criou pedidos (a loja ao vivo ficou ligada > 3 min e a reposição automática já os criou) | Falar: "a reposição automática já tinha gerado os pedidos" e mostrar na aba 🧾 Pedidos |
 | Simulação atrapalhando (números pulando demais na hora de explicar) | Desligar o 🟢 Loja ao vivo na barra lateral; o resto continua igual |
 | Erro na tela | Não tentar consertar ao vivo: vídeo |
 
